@@ -83,18 +83,15 @@ def grpo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, reward_mod
             max_new_tokens=args.max_gen_len,
             temperature=0.8,
         )
-        outputs = rollout_result.output_ids.clone()
-        completion_ids = rollout_result.completion_ids.clone()
+        outputs = rollout_result.output_ids
+        completion_ids = rollout_result.completion_ids
         completions = rollout_result.completions
         old_per_token_logps = rollout_result.per_token_logps.to(args.device).detach()
         prompt_lens = rollout_result.prompt_lens.to(args.device)
         full_mask = (outputs != tokenizer.pad_token_id).long()
         logp_pos = prompt_lens.unsqueeze(1) - 1 + torch.arange(completion_ids.size(1), device=args.device).unsqueeze(0)
 
-        # 在 policy/ref 前向占用显存之前先算 rewards，此时显存最充裕
-        torch.cuda.empty_cache()
         rewards = calculate_rewards(prompts, completions, reward_model).to(args.device)  # [B*num_gen]
-        torch.cuda.empty_cache()
 
         model_unwrapped = model.module if isinstance(model, DistributedDataParallel) else model
         with autocast_ctx:
