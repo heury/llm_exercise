@@ -339,7 +339,6 @@ class MiniMindOmni(MiniMindForCausalLM):
         if spk_emb is not None and fill_start > 0:
             audio_buffer[:, :, fill_start - 1] = self.audio_spk_token
         think_end_step, generated_tokens = None, ([] if args.get('open_thinking', False) else None)
-        seen_tokens = set(input_ids[0].tolist()) if rp != 1.0 else None
         while input_ids.shape[1] < start_pos + max_new_tokens:
             if past_kvs is None or not use_cache:
                 out = self.forward(torch.cat((audio_buffer, input_ids.unsqueeze(1)), dim=1), past_key_values=past_kvs, use_cache=use_cache, **args)
@@ -348,10 +347,8 @@ class MiniMindOmni(MiniMindForCausalLM):
             past_kvs = out.past_key_values
 
             logits = out.logits[0, -1, :].clone() / (temperature + 1e-9)
-            if seen_tokens is not None:
-                seen = list(seen_tokens)
-                score = logits[seen]
-                logits[seen] = torch.where(score > 0, score / rp, score * rp)
+            if rp != 1.0:
+                seen = list(set(input_ids[0].tolist())); score = logits[seen]; logits[seen] = torch.where(score > 0, score / rp, score * rp)
             if top_p and top_p < 1.0:
                 sorted_l, sorted_i = torch.sort(logits, descending=True)
                 mask = torch.cumsum(F.softmax(sorted_l, dim=-1), dim=-1) > top_p
@@ -362,8 +359,6 @@ class MiniMindOmni(MiniMindForCausalLM):
             if text_finished:
                 text_token = args.get('enter_token_id', 201) if first_finished else args.get('pad_token_id', 0)
                 first_finished = False
-            if seen_tokens is not None:
-                seen_tokens.add(text_token)
 
             step = input_ids.shape[1] - start_pos  # 已生成token数（0=首次，此时模型处理prompt末尾token）
             audio_step = step - 1  # 延迟1步：输出第1个text时无audio，输出第2个text时layer0开始
@@ -376,7 +371,7 @@ class MiniMindOmni(MiniMindForCausalLM):
                     audio_codes[i].append(self.audio_pad_token)
                 else:
                     logits_i = al[0, -1, :].clone() / 0.2
-                    for prev_code in audio_codes[i][-3:]: logits_i[prev_code] /= 1.05
+                    for prev_code in audio_codes[i][-3:]: score = logits_i[prev_code]; logits_i[prev_code] = torch.where(score > 0, score / 1.05, score * 1.05)
                     top_val, top_idx = logits_i.topk(50)
                     code = top_idx[torch.multinomial(F.softmax(top_val, dim=-1), 1)].item()
                     audio_codes[i].append(code)

@@ -267,9 +267,7 @@ class MiniMindForCausalLM(PreTrainedModel, GenerationMixin):
             logits = outputs.logits[:, -1, :] / temperature
             if repetition_penalty != 1.0:
                 for i in range(input_ids.shape[0]):
-                    seen = torch.unique(input_ids[i])
-                    score = logits[i, seen]
-                    logits[i, seen] = torch.where(score > 0, score / repetition_penalty, score * repetition_penalty)
+                    seen = torch.unique(input_ids[i]); score = logits[i, seen]; logits[i, seen] = torch.where(score > 0, score / repetition_penalty, score * repetition_penalty)
             if top_k > 0: 
                 logits[logits < torch.topk(logits, top_k)[0][..., -1, None]] = -float('inf')
             if top_p < 1.0:
