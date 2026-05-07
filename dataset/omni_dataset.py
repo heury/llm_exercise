@@ -276,7 +276,8 @@ class OmniDataset(Dataset):
         # 生成labels（只训练最后一个assistant）
         text_labels, assistant_ranges = self.generate_text_labels(input_ids)
         for start, end in assistant_ranges[:-1]:
-            text_labels[start:end] = [-100] * (end - start)
+            mask_end = min(end + len(self.eos_id), self.max_length)
+            text_labels[start:mask_end] = [-100] * (mask_end - start)
         
         # 生成7层audio targets（只填充最后一个assistant）
         Y_audio_layers = [[self.audio_pad_token] * self.max_length for _ in range(8)]
