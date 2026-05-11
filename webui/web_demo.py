@@ -69,7 +69,7 @@ def build_ids(prompt, history):
 def _mimi_decode(frames):
     codes = [f for f in frames if f and len(f) == 8]
     if not codes or not M['mimi']: return None
-    mc = torch.tensor(codes, dtype=torch.long).T.unsqueeze(0)
+    mc = torch.tensor(codes, dtype=torch.long, device=M['device']).T.unsqueeze(0)
     mc = torch.where(mc >= 2049, torch.zeros_like(mc), mc)
     with torch.no_grad():
         au = M['mimi'].decode(mc).audio_values.squeeze().cpu().numpy()
