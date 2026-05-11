@@ -486,7 +486,7 @@ def init_model(args):
         au = torch.full((1, 8, 3), 2049, dtype=torch.long, device=args.device)
         M['model'].forward(torch.cat((au, ids.unsqueeze(1)), dim=1))
         if M['model'].audio_encoder: M['model'].audio_encoder(torch.zeros(1, 100, 560, device=args.device), torch.tensor([100], device=args.device))
-        if M['mimi']: M['mimi'].decode(torch.zeros(1, 8, 1, dtype=torch.long))
+        if M['mimi']: M['mimi'].decode(torch.zeros(1, 8, 1, dtype=torch.long, device=args.device))
     print('Warmup done!')
 
 
