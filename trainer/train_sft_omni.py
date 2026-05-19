@@ -4,6 +4,7 @@ import sys
 __package__ = "trainer"
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+import datasets
 import argparse
 import time
 import warnings
