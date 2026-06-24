@@ -1,6 +1,7 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+.DS_Store
 build/
 dist/
 wheels/
@@ -13,3 +14,6 @@ wheels/
 minimind_dataset/
 minimind_model/
 minimind_out/
+
+# Backups of nested repository metadata after vendoring subdirectories
+.nested-git-backups/
