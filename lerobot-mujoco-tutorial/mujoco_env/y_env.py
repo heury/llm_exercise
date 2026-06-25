@@ -9,6 +9,8 @@ from mujoco_env.transforms import rpy2r, r2rpy
 import os
 import copy
 import glfw
+from pathlib import Path
+import zipfile
 
 class SimpleEnv:
     def __init__(self, 
@@ -23,6 +25,7 @@ class SimpleEnv:
             state_type: str, type of state space, 'joint_angle' or 'ee_pose'
             seed: int, seed for random number generator
         """
+        self._ensure_objaverse_archives(xml_path)
         # Load the xml file
         self.env = MuJoCoParserClass(name='Tabletop',rel_xml_path=xml_path)
         self.action_type = action_type
@@ -34,28 +37,48 @@ class SimpleEnv:
                     'joint4',
                     'joint5',
                     'joint6',]
-        self.init_viewer()
+        self._viewer_ready = False
+        self.env.reset()
         self.reset(seed)
+
+    def _ensure_objaverse_archives(self, xml_path):
+        asset_dir = Path(xml_path).parent
+        if not asset_dir.name:
+            asset_dir = Path.cwd() / "asset"
+        objaverse_dir = asset_dir / "objaverse"
+        if not objaverse_dir.exists():
+            return
+
+        for archive_path in objaverse_dir.glob("*.zip"):
+            target_dir = objaverse_dir / archive_path.stem
+            if (target_dir / "model_new.xml").exists():
+                continue
+            with zipfile.ZipFile(archive_path) as archive:
+                archive.extractall(objaverse_dir)
 
     def init_viewer(self):
         '''
         Initialize the viewer
         '''
-        self.env.reset()
         self.env.init_viewer(
             distance          = 2.0,
-            elevation         = -30, 
+            elevation         = -30,
             transparent       = False,
             black_sky         = True,
             use_rgb_overlay = False,
             loc_rgb_overlay = 'top right',
         )
+        self._viewer_ready = True
+    def _poll_viewer(self):
+        if self._viewer_ready:
+            glfw.poll_events()
+
     def reset(self, seed = None):
         '''
         Reset the environment
         Move the robot to a initial position, set the object positions based on the seed
         '''
-        if seed != None: np.random.seed(seed=0) 
+        if seed != None: np.random.seed(seed=0)
         q_init = np.deg2rad([0,0,0,0,0,0])
         q_zero,ik_err_stack,ik_info = solve_ik(
             env = self.env,
@@ -65,6 +88,7 @@ class SimpleEnv:
             p_trgt       = np.array([0.3,0.0,1.0]),
             R_trgt       = rpy2r(np.deg2rad([90,-0.,90 ])),
         )
+        self._poll_viewer()
         self.env.forward(q=q_zero,joint_names=self.joint_names,increase_tick=False)
 
         # Set object positions
@@ -82,6 +106,7 @@ class SimpleEnv:
             self.env.set_p_base_body(body_name=obj_names[obj_idx],p=obj_xyzs[obj_idx,:])
             self.env.set_R_base_body(body_name=obj_names[obj_idx],R=np.eye(3,3))
         self.env.forward(increase_tick=False)
+        self._poll_viewer()
 
         # Set the initial pose of the robot
         self.last_q = copy.deepcopy(q_zero)
@@ -91,6 +116,7 @@ class SimpleEnv:
         self.obj_init_pose = np.concatenate([mug_init_pose, plate_init_pose],dtype=np.float32)
         for _ in range(100):
             self.step_env()
+            self._poll_viewer()
         print("DONE INITIALIZATION")
         self.gripper_state = False
         self.past_chars = []

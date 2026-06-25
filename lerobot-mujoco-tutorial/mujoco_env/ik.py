@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import glfw
 from .utils import (
     get_colors,
     get_idxs,
@@ -225,6 +226,8 @@ def solve_ik(
             if ik_tick%render_every==0:
                 plot_ik_info(env,ik_info)
                 env.render()
+        if ik_tick % 100 == 0 and env.use_mujoco_viewer:
+            glfw.poll_events()
     # Print if IK error is too high
     if verbose_warning and ik_err > ik_err_th:
         print ("ik_err:[%.4f] is higher than ik_err_th:[%.4f]."%
