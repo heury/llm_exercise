@@ -36,7 +36,7 @@ class MMVisionProjector(nn.Module):
 class MiniMindVLM(MiniMindForCausalLM):
     config_class = VLMConfig
 
-    def __init__(self, config: VLMConfig = None, vision_model_path="./model/siglip2-base-p32-256-ve"):
+    def __init__(self, config: VLMConfig = None, vision_model_path="C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve"):
         self.config = config or VLMConfig()
         super().__init__(self.config)
         self.vision_encoder, self.processor = self.__class__.get_vision_model(vision_model_path)

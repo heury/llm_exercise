@@ -129,7 +129,7 @@ def load_voices():
     voices_data = {}
     builtin_voices, clone_voices = set(), set()
     for name, is_builtin in [('voices.pt', True), ('voices_unseen.pt', False)]:
-        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'model', 'speaker', name)
+        path = os.path.join('C:/dev/llm_exercise/minimind_model/speaker', name)
         if os.path.exists(path):
             data = torch.load(path, map_location=device)
             for speaker, v in data.items():
@@ -291,10 +291,10 @@ def launch_gradio(server_name="0.0.0.0", server_port=8888):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="MiniMind-O Gradio Demo")
-    parser.add_argument('--load_from', default='./', type=str, help="transformers模型扫描目录")
-    parser.add_argument('--audio_encoder', default='../model/SenseVoiceSmall', type=str)
-    parser.add_argument('--vision_model', default='../model/siglip2-base-p32-256-ve', type=str)
-    parser.add_argument('--mimi_path', default='../model/mimi', type=str)
+    parser.add_argument('--load_from', default='C:/dev/llm_exercise/minimind_model', type=str, help="transformers模型扫描目录")
+    parser.add_argument('--audio_encoder', default='C:/dev/llm_exercise/minimind_model/SenseVoiceSmall', type=str)
+    parser.add_argument('--vision_model', default='C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve', type=str)
+    parser.add_argument('--mimi_path', default='C:/dev/llm_exercise/minimind_model/mimi', type=str)
     parser.add_argument('--device', default=default_device(), type=str)
     parser.add_argument('--asr_device', default='auto', type=str, help='ASR设备；auto 在 MPS 主设备下使用 cpu，其它情况跟随 --device')
     parser.add_argument('--mimi_device', default='auto', type=str, help='Mimi 解码设备；auto 跟随 --device')

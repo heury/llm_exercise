@@ -63,7 +63,7 @@ def log_model_params(model, ignore_patterns=['audio_encoder', 'vision_encoder'])
     else: Logger(f'Model Params: {total:.2f}M')
 
 
-def init_omni_model(omni_config, from_weight='full_sft', tokenizer_path='../model', audio_encoder_path='../model/SenseVoiceSmall', vision_model_path='../model/siglip2-base-p32-256-ve', save_dir='../out', device='cuda', freeze_backbone='none', from_resume=0):
+def init_omni_model(omni_config, from_weight='full_sft', tokenizer_path='C:/dev/llm_exercise/minimind_model', audio_encoder_path='C:/dev/llm_exercise/minimind_model/SenseVoiceSmall', vision_model_path='C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve', save_dir='C:/dev/llm_exercise/minimind_out', device='cuda', freeze_backbone='none', from_resume=0):
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     model = MiniMindOmni(omni_config, audio_encoder_path=audio_encoder_path, vision_model_path=vision_model_path)
     
@@ -105,7 +105,7 @@ def init_omni_model(omni_config, from_weight='full_sft', tokenizer_path='../mode
     return model.to(device), tokenizer
 
 
-def omni_checkpoint(omni_config, weight='pretrain_omni', model=None, optimizer=None, epoch=0, step=0, wandb=None, save_dir='../checkpoints', **kwargs):
+def omni_checkpoint(omni_config, weight='pretrain_omni', model=None, optimizer=None, epoch=0, step=0, wandb=None, save_dir='C:/dev/llm_exercise/minimind_out/checkpoints', **kwargs):
     os.makedirs(save_dir, exist_ok=True)
     moe_path = '_moe' if omni_config.use_moe else ''
     ckp_path = f'{save_dir}/{weight}_{omni_config.hidden_size}{moe_path}.pth'

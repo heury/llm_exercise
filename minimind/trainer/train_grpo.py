@@ -186,7 +186,7 @@ def grpo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, reward_mod
             state_dict = raw_model.state_dict()
             torch.save({k: v.half().cpu() for k, v in state_dict.items()}, ckp)
             lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer, 
-                         epoch=epoch, step=step, wandb=wandb, save_dir='../checkpoints', scheduler=scheduler)
+                         epoch=epoch, step=step, wandb=wandb, save_dir='C:/dev/llm_exercise/minimind_out/checkpoints', scheduler=scheduler)
             model.train()
             del state_dict
 
@@ -205,7 +205,7 @@ def grpo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, reward_mod
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind GRPO (Group Relative Policy Optimization)")
-    parser.add_argument("--save_dir", type=str, default="../out", help="模型保存目录")
+    parser.add_argument("--save_dir", type=str, default="C:/dev/llm_exercise/minimind_out", help="模型保存目录")
     parser.add_argument('--save_weight', default='grpo', type=str, help="保存权重的前缀名")
     parser.add_argument("--epochs", type=int, default=1, help="训练轮数")
     parser.add_argument("--batch_size", type=int, default=2, help="batch size")
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="是否使用MoE架构（0=否，1=是）")
     parser.add_argument('--max_seq_len', default=768, type=int, help="Prompt最大长度")
     parser.add_argument("--max_gen_len", type=int, default=1024, help="生成的最大长度")
-    parser.add_argument("--data_path", type=str, default="../dataset/rlaif.jsonl", help="RLAIF数据路径")
+    parser.add_argument("--data_path", type=str, default="C:/dev/llm_exercise/minimind_dataset/rlaif.jsonl", help="RLAIF数据路径")
     parser.add_argument("--num_generations", type=int, default=6, help="每个prompt生成的样本数")
     parser.add_argument("--beta", type=float, default=0.1, help="KL惩罚系数")
     parser.add_argument("--loss_type", type=str, default="cispo", choices=["grpo", "cispo"], help="loss类型")
@@ -239,8 +239,8 @@ if __name__ == "__main__":
     parser.add_argument("--thinking_ratio", type=float, default=0.9, help="按概率开启thinking（0.0~1.0）")
     parser.add_argument("--rollout_engine", type=str, default="torch", choices=["torch", "sglang"], help="rollout引擎类型")
     parser.add_argument("--sglang_base_url", type=str, default="http://localhost:8998", help="SGLang服务器URL")
-    parser.add_argument("--sglang_model_path", type=str, default="../model", help="SGLang tokenizer路径")
-    parser.add_argument("--sglang_shared_path", type=str, default="./sglang_ckpt_grpo", help="SGLang共享存储路径")
+    parser.add_argument("--sglang_model_path", type=str, default="C:/dev/llm_exercise/minimind_model", help="SGLang tokenizer路径")
+    parser.add_argument("--sglang_shared_path", type=str, default="C:/dev/llm_exercise/minimind_out/sglang_ckpt_grpo", help="SGLang共享存储路径")
     args = parser.parse_args()
 
     # ========== 1. 初始化环境和随机种子 ==========
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config = MiniMindConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers,
                                max_seq_len=args.max_seq_len + args.max_gen_len, use_moe=bool(args.use_moe))
-    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../checkpoints') if args.from_resume==1 else None
+    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='C:/dev/llm_exercise/minimind_out/checkpoints') if args.from_resume==1 else None
     
     # ========== 3. 设置混合精度 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"

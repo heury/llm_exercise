@@ -63,7 +63,7 @@ def setup_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
-def init_vlm_model(vlm_config, from_weight='pretrain_vlm', tokenizer_path='../model', vision_model_path='../model/siglip2-base-p32-256-ve', save_dir='../out', device='cuda', freeze_llm=0):
+def init_vlm_model(vlm_config, from_weight='pretrain_vlm', tokenizer_path='C:/dev/llm_exercise/minimind_model', vision_model_path='C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve', save_dir='C:/dev/llm_exercise/minimind_out', device='cuda', freeze_llm=0):
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     model = MiniMindVLM(vlm_config, vision_model_path=vision_model_path)
     
@@ -97,7 +97,7 @@ def init_vlm_model(vlm_config, from_weight='pretrain_vlm', tokenizer_path='../mo
     return model.to(device), tokenizer, preprocess
 
 
-def vlm_checkpoint(vlm_config, weight='pretrain_vlm', model=None, optimizer=None, epoch=0, step=0, wandb=None, save_dir='../checkpoints', **kwargs):
+def vlm_checkpoint(vlm_config, weight='pretrain_vlm', model=None, optimizer=None, epoch=0, step=0, wandb=None, save_dir='C:/dev/llm_exercise/minimind_out/checkpoints', **kwargs):
     os.makedirs(save_dir, exist_ok=True)
     moe_path = '_moe' if vlm_config.use_moe else ''
     ckp_path = f'{save_dir}/{weight}_{vlm_config.hidden_size}{moe_path}.pth'

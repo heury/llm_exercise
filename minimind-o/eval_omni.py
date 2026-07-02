@@ -18,25 +18,25 @@ def init_model(args):
     tokenizer = AutoTokenizer.from_pretrained(args.load_from)
     if 'model' in args.load_from:
         moe_suffix = '_moe' if args.use_moe else ''
-        ckp = f'./{args.save_dir}/{args.weight}_{args.hidden_size}{moe_suffix}.pth'
+        ckp = f'{args.save_dir}/{args.weight}_{args.hidden_size}{moe_suffix}.pth'
         model = MiniMindOmni(
             OmniConfig(
                 hidden_size=args.hidden_size, 
                 num_hidden_layers=args.num_hidden_layers, 
                 use_moe=bool(args.use_moe)
             ),
-            audio_encoder_path="./model/SenseVoiceSmall",
-            vision_model_path="./model/siglip2-base-p32-256-ve"
+            audio_encoder_path="C:/dev/llm_exercise/minimind_model/SenseVoiceSmall",
+            vision_model_path="C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve"
         )
         model.load_state_dict(torch.load(ckp, map_location=args.device), strict=False)
     else:
         model = AutoModelForCausalLM.from_pretrained(args.load_from, trust_remote_code=True)
-        model.audio_encoder, model.audio_processor = MiniMindOmni.load_sensevoice("./model/SenseVoiceSmall")
-        model.vision_encoder, model.vision_processor = MiniMindOmni.load_vision("./model/siglip2-base-p32-256-ve")
+        model.audio_encoder, model.audio_processor = MiniMindOmni.load_sensevoice("C:/dev/llm_exercise/minimind_model/SenseVoiceSmall")
+        model.vision_encoder, model.vision_processor = MiniMindOmni.load_vision("C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve")
     log_model_params(model)
     if model.audio_encoder is not None: model.audio_encoder.to(args.device)
     if model.vision_encoder is not None: model.vision_encoder.to(args.device)
-    model.mimi_model = MimiModel.from_pretrained("./model/mimi").eval()
+    model.mimi_model = MimiModel.from_pretrained("C:/dev/llm_exercise/minimind_model/mimi").eval()
     return model.half().eval().to(args.device), tokenizer
 
 
@@ -89,8 +89,8 @@ def eval_sample(model, tokenizer, args, idx, prompt, audio_inputs, output_name, 
 
 def main():
     parser = argparse.ArgumentParser(description="MiniMind-O Chat")
-    parser.add_argument('--load_from', default='model', type=str, help="模型加载路径（model=原生torch权重）")
-    parser.add_argument('--save_dir', default='out', type=str, help="模型权重目录")
+    parser.add_argument('--load_from', default='C:/dev/llm_exercise/minimind_model', type=str, help="模型加载路径（model=原生torch权重）")
+    parser.add_argument('--save_dir', default='C:/dev/llm_exercise/minimind_out', type=str, help="模型权重目录")
     parser.add_argument('--weight', default='sft_omni', type=str, help="权重名称前缀")
     parser.add_argument('--hidden_size', default=768, type=int, help="隐藏层维度")
     parser.add_argument('--num_hidden_layers', default=8, type=int, help="隐藏层数量")
@@ -98,10 +98,10 @@ def main():
     parser.add_argument('--max_new_tokens', default=512, type=int, help="最大生成长度")
     parser.add_argument('--temperature', default=0.7, type=float, help="Thinker生成温度")
     parser.add_argument('--top_p', default=0.85, type=float, help="nucleus采样阈值")
-    parser.add_argument('--output_dir', default='./output_audio/', type=str, help="输出音频保存目录")
+    parser.add_argument('--output_dir', default='C:/dev/llm_exercise/minimind_out/output_audio/', type=str, help="输出音频保存目录")
     parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', type=str, help="运行设备")
-    parser.add_argument('--audio_dir', default='./dataset/eval_omni/', type=str, help="测试音频目录")
-    parser.add_argument('--image_dir', default='./dataset/eval_omni/', type=str, help="测试图像目录")
+    parser.add_argument('--audio_dir', default='C:/dev/llm_exercise/minimind_dataset/eval_omni/', type=str, help="测试音频目录")
+    parser.add_argument('--image_dir', default='C:/dev/llm_exercise/minimind_dataset/eval_omni/', type=str, help="测试图像目录")
     parser.add_argument('--open_thinking', default=0, type=int, help="是否开启思考模式（0=否，1=是）（思考模式下禁用audio输出）")
     parser.add_argument('--decode_audio', default=1, type=int, help="是否解码音频输出（0=否，1=是）")
     parser.add_argument('--mode', default='0', type=str, help="评估模式：-1=all 0=text 1=multi 2=audio 3=clone 4=image 5=mix（逗号组合，如 2,5）")
@@ -192,7 +192,7 @@ def main():
         clone_prompts_en = ["Hello, please introduce yourself.", "What's the weather like today?", "Tell me a joke."]
         clone_prompts_zh = ["你好，请介绍一下你自己。", "今天天气怎么样？", "给我讲个笑话吧。"]
         clone_prompts = [clone_prompts_en, clone_prompts_zh, clone_prompts_en + clone_prompts_zh][args.prompt_lang]
-        voices_pt = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model', 'speaker', 'voices_unseen.pt')
+        voices_pt = 'C:/dev/llm_exercise/minimind_model/speaker/voices_unseen.pt'
         voices = [('default', None, None)]
         if os.path.exists(voices_pt):
             voice_data = torch.load(voices_pt, map_location=args.device)

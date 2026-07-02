@@ -357,7 +357,7 @@ def rl_train_epoch(epoch, loader, iters, rollout_engine, ref_model, reward_model
             state_dict = raw_model.state_dict()
             torch.save({k: v.half().cpu() for k, v in state_dict.items()}, ckp)
             lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer,
-                         epoch=epoch, step=step, wandb=wandb, save_dir='../checkpoints', scheduler=scheduler)
+                         epoch=epoch, step=step, wandb=wandb, save_dir='C:/dev/llm_exercise/minimind_out/checkpoints', scheduler=scheduler)
             model.train()
             del state_dict
 
@@ -373,7 +373,7 @@ def rl_train_epoch(epoch, loader, iters, rollout_engine, ref_model, reward_model
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind Agent RL")
-    parser.add_argument("--save_dir", type=str, default="../out", help="模型保存目录")
+    parser.add_argument("--save_dir", type=str, default="C:/dev/llm_exercise/minimind_out", help="模型保存目录")
     parser.add_argument('--save_weight', default='agent', type=str, help="保存权重名称")
     parser.add_argument("--epochs", type=int, default=1, help="训练轮数")
     parser.add_argument("--batch_size", type=int, default=2, help="批次大小")
@@ -391,7 +391,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_seq_len', default=1024, type=int, help="最大序列长度")
     parser.add_argument("--max_gen_len", type=int, default=768, help="单次最大生成长度")
     parser.add_argument("--max_total_len", type=int, default=2500, help="训练侧最终总长度上界")
-    parser.add_argument("--data_path", type=str, default="../dataset/agent_rl.jsonl", help="训练数据路径")
+    parser.add_argument("--data_path", type=str, default="C:/dev/llm_exercise/minimind_dataset/agent_rl.jsonl", help="训练数据路径")
     parser.add_argument("--num_generations", type=int, default=4, help="每个prompt生成数量")
     parser.add_argument("--beta", type=float, default=0.1, help="KL散度惩罚系数")
     parser.add_argument("--loss_type", type=str, default="cispo", choices=["grpo", "cispo"], help="loss类型")
@@ -408,8 +408,8 @@ if __name__ == "__main__":
     parser.add_argument("--reward_model_path", type=str, default="../../internlm2-1_8b-reward", help="Reward模型路径")
     parser.add_argument("--rollout_engine", type=str, default="torch", choices=["torch", "sglang"], help="rollout引擎类型")
     parser.add_argument("--sglang_base_url", type=str, default="http://localhost:8998", help="SGLang服务器URL")
-    parser.add_argument("--sglang_model_path", type=str, default="../model", help="SGLang tokenizer路径")
-    parser.add_argument("--sglang_shared_path", type=str, default="./sglang_ckpt_agent", help="SGLang共享存储路径")
+    parser.add_argument("--sglang_model_path", type=str, default="C:/dev/llm_exercise/minimind_model", help="SGLang tokenizer路径")
+    parser.add_argument("--sglang_shared_path", type=str, default="C:/dev/llm_exercise/minimind_out/sglang_ckpt_agent", help="SGLang共享存储路径")
     args = parser.parse_args()
 
     local_rank = init_distributed_mode()
@@ -419,7 +419,7 @@ if __name__ == "__main__":
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config = MiniMindConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers,
                                max_seq_len=args.max_seq_len + args.max_gen_len, use_moe=bool(args.use_moe))
-    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../checkpoints') if args.from_resume == 1 else None
+    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='C:/dev/llm_exercise/minimind_out/checkpoints') if args.from_resume == 1 else None
 
     device_type = "cuda" if "cuda" in args.device else "cpu"
     dtype = torch.bfloat16 if args.dtype == "bfloat16" else torch.float16

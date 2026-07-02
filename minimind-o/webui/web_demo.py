@@ -117,7 +117,7 @@ def register_voice(name, value, group='manual'):
             lst.remove(name)
 
 def clone_voice_path():
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'model', 'speaker', CLONE_FILE)
+    return os.path.join('C:/dev/llm_exercise/minimind_model/speaker', CLONE_FILE)
 
 def delete_manual_voice(name):
     if name not in V_manual:
@@ -203,8 +203,8 @@ def load_main_model(model_path, model_name):
         if torch.cuda.is_available(): torch.cuda.empty_cache()
         tok = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         m = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
-        vision_encoder, vision_processor = MiniMindOmni.load_vision('../model/siglip2-base-p32-256-ve')
-        audio_encoder, audio_processor = MiniMindOmni.load_sensevoice('../model/SenseVoiceSmall')
+        vision_encoder, vision_processor = MiniMindOmni.load_vision('C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve')
+        audio_encoder, audio_processor = MiniMindOmni.load_sensevoice('C:/dev/llm_exercise/minimind_model/SenseVoiceSmall')
         object.__setattr__(m, 'vision_encoder', vision_encoder)
         object.__setattr__(m, 'vision_processor', vision_processor)
         object.__setattr__(m, 'audio_encoder', audio_encoder)
@@ -277,7 +277,7 @@ def clone_voice():
         saved[name] = value
         torch.save(saved, out_path)
         register_voice(name, value, group='manual')
-        return Response(json.dumps({'ok': True, 'voice': name, 'path': './model/speaker/' + CLONE_FILE}), mimetype='application/json')
+        return Response(json.dumps({'ok': True, 'voice': name, 'path': 'C:/dev/llm_exercise/minimind_model/speaker/' + CLONE_FILE}), mimetype='application/json')
     except Exception as e:
         return Response(json.dumps({'ok': False, 'error': str(e)}), status=500, mimetype='application/json')
 
@@ -443,7 +443,7 @@ def realtime(ws):
 def init_model(args):
     M['cfg'] = args; M['device'] = args.device
     with contextlib.redirect_stdout(io.StringIO()):
-        M['asr'] = AutoModel(model='../model/SenseVoiceSmall', trust_remote_code=True, device=args.device, disable_update=True)
+        M['asr'] = AutoModel(model='C:/dev/llm_exercise/minimind_model/SenseVoiceSmall', trust_remote_code=True, device=args.device, disable_update=True)
     M['models'] = scan_hf_models(args.load_from)
     if not M['models']:
         raise RuntimeError(f"未在 {os.path.abspath(args.load_from)} 找到 transformers 模型")
@@ -451,7 +451,7 @@ def init_model(args):
     load_main_model(M['models'][model_name], model_name)
     try:
         from transformers import MimiModel
-        M['mimi'] = MimiModel.from_pretrained('../model/mimi').eval().to(args.device)
+        M['mimi'] = MimiModel.from_pretrained('C:/dev/llm_exercise/minimind_model/mimi').eval().to(args.device)
         if args.device != 'cpu': M['mimi'] = M['mimi'].half()
         print('Mimi model loaded')
     except: M['mimi'] = None
@@ -459,7 +459,7 @@ def init_model(args):
         from modelscope.models.audio.sv.DTDNN import CAMPPlus
         M['campplus'] = CAMPPlus(feat_dim=80, embedding_size=192, growth_rate=32, bn_size=4,
                                  init_channels=128, config_str='batchnorm-relu', memory_efficient=True)
-        sd = torch.load('../model/campplus/campplus_cn_common.pt', map_location='cpu')
+        sd = torch.load('C:/dev/llm_exercise/minimind_model/campplus/campplus_cn_common.pt', map_location='cpu')
         M['campplus'].load_state_dict({k: v.float() for k, v in sd.items()})
         M['campplus'] = M['campplus'].eval().to(args.device)
         M['mel_fn'] = torchaudio.transforms.MelSpectrogram(
@@ -470,8 +470,8 @@ def init_model(args):
     except Exception as e:
         M['campplus'], M['mel_fn'] = None, None
         print(f'CAM++ load failed: {e}')
-    M['vad_path'] = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'model', 'vad', 'silero_vad.onnx')
-    spk_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'model', 'speaker')
+    M['vad_path'] = 'C:/dev/llm_exercise/minimind_model/vad/silero_vad.onnx'
+    spk_dir = 'C:/dev/llm_exercise/minimind_model/speaker'
     for fn, group in [('voices.pt', 'builtin'), ('voices_unseen.pt', 'unseen'), (CLONE_FILE, 'manual')]:
         fp = os.path.join(spk_dir, fn)
         if os.path.exists(fp):
@@ -492,7 +492,7 @@ def init_model(args):
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
-    p.add_argument('--load_from', default='./', help='模型权重搜索目录；目录下可放多个 HF 格式模型，WebUI 会自动扫描并允许切换。')
+    p.add_argument('--load_from', default='C:/dev/llm_exercise/minimind_model', help='模型权重搜索目录；目录下可放多个 HF 格式模型，WebUI 会自动扫描并允许切换。')
     p.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', help='推理设备；CUDA 可用时默认 cuda。显存不足或排查环境问题时可改为 cpu。')
     p.add_argument('--port', default=7860, type=int, help='WebUI 服务端口；端口被占用或需要同时启动多个实例时调整。')
     p.add_argument('--audio_chunk_frames', default=4, type=int, help='流式播放每次解码的 Mimi frame 数；默认 4 约 320ms。WebUI 播放卡顿时可调大到 8/12，低延迟优先时保持 4。')
