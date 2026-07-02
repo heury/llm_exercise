@@ -24,7 +24,7 @@ def convert_torch2transformers_minimind(torch_path, transformers_path, dtype=tor
     model_params = sum(p.numel() for p in lm_model.parameters() if p.requires_grad)
     print(f'模型参数: {model_params / 1e6} 百万 = {model_params / 1e9} B (Billion)')
     lm_model.save_pretrained(transformers_path, safe_serialization=False)
-    tokenizer = AutoTokenizer.from_pretrained('../model/')
+    tokenizer = AutoTokenizer.from_pretrained('C:/dev/llm_exercise/minimind_model/')
     tokenizer.save_pretrained(transformers_path)
     # ======= transformers-5.0的兼容低版本写法 =======
     if int(transformers.__version__.split('.')[0]) >= 5:
@@ -83,7 +83,7 @@ def convert_torch2transformers(torch_path, transformers_path, dtype=torch.float1
     qwen_model.save_pretrained(transformers_path)
     model_params = sum(p.numel() for p in qwen_model.parameters() if p.requires_grad)
     print(f'模型参数: {model_params / 1e6} 百万 = {model_params / 1e9} B (Billion)')
-    tokenizer = AutoTokenizer.from_pretrained('../model/')
+    tokenizer = AutoTokenizer.from_pretrained('C:/dev/llm_exercise/minimind_model/')
     tokenizer.save_pretrained(transformers_path)
 
     # ======= transformers-5.0的兼容低版本写法 =======
@@ -129,16 +129,16 @@ if __name__ == '__main__':
     lm_config = MiniMindConfig(hidden_size=768, num_hidden_layers=8, max_seq_len=8192, use_moe=False)
 
     # convert torch to transformers
-    torch_path = f"../out/full_sft_{lm_config.hidden_size}{'_moe' if lm_config.use_moe else ''}.pth"
-    transformers_path = '../minimind-3'
+    torch_path = f"C:/dev/llm_exercise/minimind_out/full_sft_{lm_config.hidden_size}{'_moe' if lm_config.use_moe else ''}.pth"
+    transformers_path = 'C:/dev/llm_exercise/minimind_out/minimind-3'
     convert_torch2transformers(torch_path, transformers_path)
 
     # # merge lora
-    # base_torch_path = f"../out/full_sft_{lm_config.hidden_size}{'_moe' if lm_config.use_moe else ''}.pth"
-    # lora_path = f"../out/lora_identity_{lm_config.hidden_size}{'_moe' if lm_config.use_moe else ''}.pth"
-    # merged_torch_path = f"../out/merge_identity_{lm_config.hidden_size}{'_moe' if lm_config.use_moe else ''}.pth"
+    # base_torch_path = f"C:/dev/llm_exercise/minimind_out/full_sft_{lm_config.hidden_size}{'_moe' if lm_config.use_moe else ''}.pth"
+    # lora_path = f"C:/dev/llm_exercise/minimind_out/lora_identity_{lm_config.hidden_size}{'_moe' if lm_config.use_moe else ''}.pth"
+    # merged_torch_path = f"C:/dev/llm_exercise/minimind_out/merge_identity_{lm_config.hidden_size}{'_moe' if lm_config.use_moe else ''}.pth"
     # convert_merge_base_lora(base_torch_path, lora_path, merged_torch_path)
 
     # convert_transformers2torch(transformers_path, torch_path)
-    # convert_json_to_jinja('../model/tokenizer_config.json', '../model/chat_template.jinja')
-    # convert_jinja_to_json('../model/chat_template.jinja')
+    # convert_json_to_jinja('C:/dev/llm_exercise/minimind_model/tokenizer_config.json', 'C:/dev/llm_exercise/minimind_model/chat_template.jinja')
+    # convert_jinja_to_json('C:/dev/llm_exercise/minimind_model/chat_template.jinja')

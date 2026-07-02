@@ -104,7 +104,7 @@ class TalkerModule(nn.Module):
 
 class MiniMindOmni(MiniMindForCausalLM):
     config_class = OmniConfig
-    def __init__(self, config: OmniConfig = None, audio_encoder_path="./model/SenseVoiceSmall", vision_model_path="./model/siglip2-base-p32-256-ve"):
+    def __init__(self, config: OmniConfig = None, audio_encoder_path="C:/dev/llm_exercise/minimind_model/SenseVoiceSmall", vision_model_path="C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve"):
         config = config or OmniConfig()
         super().__init__(config)
         object.__setattr__(self, 'thinker', self.model)  # alias: self.thinker == self.model

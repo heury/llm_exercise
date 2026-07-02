@@ -4,8 +4,8 @@ import os
 import json
 from tokenizers import decoders, models, pre_tokenizers, trainers, Tokenizer
 
-DATA_PATH = '../dataset/sft_t2t_mini.jsonl'
-TOKENIZER_DIR = '../model_learn_tokenizer/'
+DATA_PATH = 'C:/dev/llm_exercise/minimind_dataset/sft_t2t_mini.jsonl'
+TOKENIZER_DIR = 'C:/dev/llm_exercise/minimind_model/model_learn_tokenizer/'
 VOCAB_SIZE = 6400
 SPECIAL_TOKENS_NUM = 36
 

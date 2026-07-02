@@ -97,7 +97,7 @@ class TorchRolloutEngine(RolloutEngine):
 
 # ===== SGLang HTTP API 推理引擎 =====
 class SGLangRolloutEngine(RolloutEngine):
-    def __init__(self, base_url: str, model_path: str, shared_ckpt_path: str = "./sglang_ckpt", timeout: int = 120):
+    def __init__(self, base_url: str, model_path: str, shared_ckpt_path: str = "C:/dev/llm_exercise/minimind_out/sglang_ckpt", timeout: int = 120):
         self.base_url = base_url.rstrip('/')
         self.shared_ckpt_path = shared_ckpt_path
         self.timeout = timeout
