@@ -14,27 +14,23 @@ from model.model_omni import MiniMindOmni
     
 
 
-# 기능: is_main_process 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def is_main_process():
     return not dist.is_initialized() or dist.get_rank() == 0
 
 
-# 기능: Logger 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def Logger(content):
     if is_main_process():
         print(content)
 
 
-# 기능: get_lr에서 현재 상태의 필요 값을 조회해 반환합니다.
 def get_lr(current_step, total_steps, lr):
-    # mmv와 동일하게 초기 lr=1.0*base_lr, 최종 lr=0.1*base_lr 사용
+    # 与 mmv 保持一致：初始 lr=1.0*base_lr，最终 lr=0.1*base_lr
     return lr * (0.1 + 0.45 * (1 + math.cos(math.pi * current_step / total_steps)))
 
 
-# 기능: init_distributed_mode 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def init_distributed_mode():
     if int(os.environ.get("RANK", -1)) == -1:
-        return 0  # ?-DDP ??
+        return 0  # 非DDP模式
     
     dist.init_process_group(backend="nccl")
     local_rank = int(os.environ["LOCAL_RANK"])
@@ -42,9 +38,7 @@ def init_distributed_mode():
     return local_rank
 
 
-# 기능: Python, NumPy, PyTorch, CUDA 난수 시드를 고정해 학습 재현성을 맞춥니다.
-def setup_seed(seed:
-    int):
+def setup_seed(seed: int):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -54,11 +48,8 @@ def setup_seed(seed:
     torch.backends.cudnn.benchmark = False
 
 
-# 기능: log_model_params 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def log_model_params(model, ignore_patterns=['audio_encoder', 'vision_encoder']):
-    # 기능: should_count 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
-    def should_count(n):
-        return not any(p in n for p in ignore_patterns)
+    def should_count(n): return not any(p in n for p in ignore_patterns)
     total = sum(p.numel() for n, p in model.named_parameters() if should_count(n)) / 1e6
     cfg = model.config
     n_routed = getattr(cfg, 'n_routed_experts', getattr(cfg, 'num_experts', 0))
@@ -72,8 +63,7 @@ def log_model_params(model, ignore_patterns=['audio_encoder', 'vision_encoder'])
     else: Logger(f'Model Params: {total:.2f}M')
 
 
-# 기능: init_omni_model 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
-def init_omni_model(omni_config, from_weight='full_sft', tokenizer_path='../../minimind_model', audio_encoder_path='../../minimind_model/SenseVoiceSmall', vision_model_path='../../minimind_model/siglip2-base-p32-256-ve', save_dir='../../minimind_out', device='cuda', freeze_backbone='none', from_resume=0):
+def init_omni_model(omni_config, from_weight='full_sft', tokenizer_path='../model', audio_encoder_path='../model/SenseVoiceSmall', vision_model_path='../model/siglip2-base-p32-256-ve', save_dir='../out', device='cuda', freeze_backbone='none', from_resume=0):
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     model = MiniMindOmni(omni_config, audio_encoder_path=audio_encoder_path, vision_model_path=vision_model_path)
     
@@ -99,24 +89,23 @@ def init_omni_model(omni_config, from_weight='full_sft', tokenizer_path='../../m
                         model.talker.layers[i].load_state_dict(model.thinker.layers[src].state_dict())
                     Logger(f'Talker层初始化: 复制thinker layers[{n_thinker-n_talker}:{n_thinker}] → talker layers[0:{n_talker}]')
     
-    # 해당 단계의 처리 흐름을 설명
+    # 冻结策略
     if freeze_backbone == 'all':
-        # 해당 단계의 처리 흐름을 설명
+        # 冻结整个主干模型
         for param in model.model.parameters():
             param.requires_grad = False
     elif freeze_backbone == 'last1':
-        # 해당 단계의 처리 흐름을 설명
+        # 冻结除了最后1层之外的所有层
         for param in model.model.parameters():
             param.requires_grad = False
-        # 해당 단계의 처리 흐름을 설명
+        # 打开最后1层
         if hasattr(model.model, 'layers') and len(model.model.layers) > 0:
             for param in model.model.layers[-1].parameters():
                 param.requires_grad = True
     return model.to(device), tokenizer
 
 
-# 기능: omni_checkpoint 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
-def omni_checkpoint(omni_config, weight='pretrain_omni', model=None, optimizer=None, epoch=0, step=0, wandb=None, save_dir='../../minimind_out/checkpoints', **kwargs):
+def omni_checkpoint(omni_config, weight='pretrain_omni', model=None, optimizer=None, epoch=0, step=0, wandb=None, save_dir='../checkpoints', **kwargs):
     os.makedirs(save_dir, exist_ok=True)
     moe_path = '_moe' if omni_config.use_moe else ''
     ckp_path = f'{save_dir}/{weight}_{omni_config.hidden_size}{moe_path}.pth'
@@ -126,7 +115,7 @@ def omni_checkpoint(omni_config, weight='pretrain_omni', model=None, optimizer=N
         from torch.nn.parallel import DistributedDataParallel
         raw_model = model.module if isinstance(model, DistributedDataParallel) else model
         raw_model = getattr(raw_model, '_orig_mod', raw_model)
-        # 동결된 audio_encoder / vision_encoder 파라미터는 저장하지 않고 사전학습 경로에서 다시 로드
+        # 移除冻结的 audio_encoder / vision_encoder 参数（不需要保存，从预训练路径重新加载）
         clean_state_dict = {k: v for k, v in raw_model.state_dict().items() if not k.startswith('audio_encoder.') and not k.startswith('vision_encoder.')}
         state_dict = {k: v.half().cpu() for k, v in clean_state_dict.items()}
         ckp_tmp = ckp_path + '.tmp'
@@ -162,7 +151,7 @@ def omni_checkpoint(omni_config, weight='pretrain_omni', model=None, optimizer=N
         resume_tmp = resume_path + '.tmp'
         torch.save(resume_data, resume_tmp)
         os.replace(resume_tmp, resume_path)
-    else:  # ?? ??
+    else:  # 加载模式
         if os.path.exists(resume_path):
             ckp_data = torch.load(resume_path, map_location='cpu')
             saved_ws = ckp_data.get('world_size', 1)
@@ -174,7 +163,6 @@ def omni_checkpoint(omni_config, weight='pretrain_omni', model=None, optimizer=N
         return None
 
 
-# 기능: vlm_collate_fn 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def vlm_collate_fn(batch):
     input_ids = torch.stack([b[0] for b in batch])
     labels = torch.stack([b[1] for b in batch])
@@ -186,15 +174,12 @@ def vlm_collate_fn(batch):
     return input_ids, labels, pixel_values
 
 
-# 역할: `SkipBatchSampler` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
 class SkipBatchSampler(Sampler):
-    # 기능: SkipBatchSampler 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, sampler, batch_size, skip_batches=0):
         self.sampler = sampler
         self.batch_size = batch_size
         self.skip_batches = skip_batches
     
-    # 기능: __iter__ 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def __iter__(self):
         batch = []
         skipped = 0
@@ -210,7 +195,6 @@ class SkipBatchSampler(Sampler):
         if len(batch) > 0 and skipped >= self.skip_batches:
             yield batch
     
-    # 기능: __len__ 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def __len__(self):
         total_batches = (len(self.sampler) + self.batch_size - 1) // self.batch_size
         return max(0, total_batches - self.skip_batches)

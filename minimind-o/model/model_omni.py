@@ -1,4 +1,3 @@
-# MiniMind-O 옴니모달 모델: Thinker(텍스트)+Talker(오디오) 듀얼 아키텍처, 오디오/비전 인코더, VAD 세션
 import os, math, torch, soundfile as sf, librosa, warnings, numpy as np, onnxruntime as ort, logging, contextlib, io
 from types import SimpleNamespace
 from torch import nn
@@ -8,15 +7,13 @@ from transformers import SiglipImageProcessor, SiglipVisionModel, logging as hf_
 from .model_minimind import *
 
 
-# MiniMind-O 설정: Talker 레이어, 오디오/비전 토큰, 코덱 vocab 등 옴니모달 하이퍼파라미터
 class OmniConfig(MiniMindConfig):
     model_type = "minimind-o"
-    # 기능: OmniConfig 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.num_talker_hidden_layers = kwargs.get("num_talker_hidden_layers", 4)
         self.talker_hidden_size = kwargs.get("talker_hidden_size", 768)
-        self.audio_ids = kwargs.get("audio_ids", [16]) # "<|audio_pad|>" 토큰 ID
+        self.audio_ids = kwargs.get("audio_ids", [16]) # "<|audio_pad|>" token id
         self.audio_special_token = kwargs.get("audio_special_token", "<|audio_pad|>")
         self.audio_hidden_size = kwargs.get("audio_hidden_size", 512)
         self.audio_vocab_size = kwargs.get("audio_vocab_size", 2112)
@@ -25,15 +22,13 @@ class OmniConfig(MiniMindConfig):
         self.audio_spk_token = kwargs.get("audio_spk_token", 2051)
         self.spk_emb_size = kwargs.get("spk_emb_size", 192)
         self.think_end_ids = kwargs.get("think_end_ids", [26, 234, 234]) # </think>\n\n
-        self.image_ids = kwargs.get("image_ids", [12]) # "<|image_pad|>" 토큰 ID
+        self.image_ids = kwargs.get("image_ids", [12]) # "<|image_pad|>" token id
         self.image_special_token = kwargs.get("image_special_token", "<|image_pad|>")
         self.image_hidden_size = kwargs.get("image_hidden_size", 768)
         self.image_token_len = kwargs.get("image_token_len", 64)
         self.bridge_layer = kwargs.get("bridge_layer", self.num_hidden_layers // 2 - 1)
 
-# 오디오 프로젝터: 오디오 인코더 출력을 LLM 은닉 공간으로 매핑
 class MMAudioProjector(nn.Module):
-    # 기능: MMAudioProjector 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, in_dim, out_dim):
         super().__init__()
         self.mlp = nn.Sequential(
@@ -42,14 +37,11 @@ class MMAudioProjector(nn.Module):
             nn.GELU(),
             nn.Linear(out_dim, out_dim),
         )
-    # 기능: MMAudioProjector의 forward 경로에서 해당 모듈의 주요 연산을 계산합니다.
     def forward(self, x):
         return self.mlp(x)
 
 
-# 비전 프로젝터: 비전 인코더 출력을 LLM 은닉 공간으로 매핑
 class MMVisionProjector(nn.Module):
-    # 기능: MMVisionProjector 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, in_dim, out_dim, source_tokens=64, target_tokens=64):
         super().__init__()
         self.mlp = nn.Sequential(
@@ -58,44 +50,33 @@ class MMVisionProjector(nn.Module):
             nn.GELU(),
             nn.Linear(out_dim, out_dim),
         )
-    # 기능: MMVisionProjector의 forward 경로에서 해당 모듈의 주요 연산을 계산합니다.
     def forward(self, x):
         return self.mlp(x)
 
 
-# Talker 출력 헤드: 기본 선형 + 레이어별 LoRA 어댑터로 8층 오디오 코드 예측
 class TalkerHead(nn.Module):
-    # 기능: TalkerHead 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, in_features, out_features, num_layers=8, rank=256):
         super().__init__()
         self.num_layers = num_layers
         self.base = nn.Linear(in_features, out_features, bias=False)
         self.adapters = nn.ModuleList([nn.Sequential(nn.Linear(in_features, rank, bias=False), nn.GELU(), nn.Linear(rank, out_features, bias=False)) for _ in range(num_layers)])
-    # 기능: TalkerHead의 forward 경로에서 해당 모듈의 주요 연산을 계산합니다.
     def forward(self, x):
         base_out = self.base(x)
         return [base_out + adapter(x) for adapter in self.adapters]
 
 
-# Talker 입력 임베딩: 8층 오디오 코드를 기본 임베딩 + 어댑터로 합산
 class TalkerEmbedding(nn.Module):
-    # 기능: TalkerEmbedding 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, num_embeddings, embedding_dim, num_layers=8, rank=256):
         super().__init__()
         self.num_layers = num_layers
         self.base = nn.Embedding(num_embeddings, embedding_dim)
         self.adapters = nn.ModuleList([nn.Sequential(nn.Embedding(num_embeddings, rank), nn.GELU(), nn.Linear(rank, embedding_dim, bias=False)) for _ in range(num_layers)])
-    # 기능: TalkerEmbedding의 forward 경로에서 해당 모듈의 주요 연산을 계산합니다.
     def forward(self, x):
         base_out = self.base(x)
         return sum(base_out[:, i, :] + self.adapters[i](x[:, i, :]) for i in range(len(self.adapters))) / self.num_layers
 
-# SenseVoice 오디오 전처리기: 파형을 fbank 특징으로 변환
 class SenseVoiceAudioProcessor:
-    # 기능: SenseVoiceAudioProcessor 객체가 사용할 계층과 상태를 초기화합니다.
-    def __init__(self, frontend):
-        self.frontend = frontend
-    # 기능: SenseVoiceAudioProcessor의 forward 경로에서 해당 모듈의 주요 연산을 계산합니다.
+    def __init__(self, frontend): self.frontend = frontend
     def __call__(self, wav, sampling_rate=16000, return_tensors="pt", return_attention_mask=True, **kwargs):
         if isinstance(wav, np.ndarray): wav = torch.from_numpy(wav).float()
         if wav.dim() == 1: wav = wav.unsqueeze(0)
@@ -104,9 +85,7 @@ class SenseVoiceAudioProcessor:
         return SimpleNamespace(input_features=fbank, attention_mask=(torch.arange(fbank.size(1)) < flen[0]).long().unsqueeze(0))
 
 
-# Talker 모듈: Thinker의 브릿지 은닉 상태 + 오디오 코드를 입력으로 받아 오디오 로짓 출력
 class TalkerModule(nn.Module):
-    # 기능: TalkerModule 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, config):
         super().__init__()
         self.talker_config = MiniMindConfig(hidden_size=config.talker_hidden_size, use_moe=config.use_moe)
@@ -123,16 +102,13 @@ class TalkerModule(nn.Module):
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
 
 
-# MiniMind-O 메인 모델: Thinker(텍스트 LLM) + Talker(오디오 생성) + 오디오/비전 인코더
 class MiniMindOmni(MiniMindForCausalLM):
     config_class = OmniConfig
-    # 기능: MiniMindOmni 객체가 사용할 계층과 상태를 초기화합니다.
-    def __init__(self, config:
-        OmniConfig = None, audio_encoder_path="../minimind_model/SenseVoiceSmall", vision_model_path="../minimind_model/siglip2-base-p32-256-ve"):
+    def __init__(self, config: OmniConfig = None, audio_encoder_path="./model/SenseVoiceSmall", vision_model_path="./model/siglip2-base-p32-256-ve"):
         config = config or OmniConfig()
         super().__init__(config)
-        object.__setattr__(self, 'thinker', self.model)  # 별칭: self.thinker == self.model
-        object.__setattr__(self.model, 'lm_head', self.lm_head)  # 별칭: self.thinker.lm_head == self.lm_head
+        object.__setattr__(self, 'thinker', self.model)  # alias: self.thinker == self.model
+        object.__setattr__(self.model, 'lm_head', self.lm_head)  # alias: self.thinker.lm_head == self.lm_head
         self.talker = TalkerModule(config)
         self.audio_proj = MMAudioProjector(config.audio_hidden_size, config.hidden_size)
         self.vision_proj = MMVisionProjector(config.image_hidden_size, config.hidden_size, target_tokens=config.image_token_len)
@@ -144,7 +120,6 @@ class MiniMindOmni(MiniMindForCausalLM):
         object.__setattr__(self, 'vision_encoder', vision_encoder)
         object.__setattr__(self, 'vision_processor', vision_processor)
 
-    # SenseVoice 오디오 인코더 로드 (추론 전용, 파라미터 동결)
     @staticmethod
     def load_sensevoice(path):
         if not os.path.exists(path):
@@ -159,7 +134,6 @@ class MiniMindOmni(MiniMindForCausalLM):
         for p in encoder.parameters(): p.requires_grad = False
         return encoder.eval().float(), SenseVoiceAudioProcessor(frontend.eval())
 
-    # 오디오 입력을 인코딩하여 프로젝션된 특징 벡터 리스트 반환
     @torch.compiler.disable
     def encode_audio_inputs(self, audio_inputs, audio_lens=None):
         if (audio_inputs is None) or (self.audio_encoder is None) or (not audio_inputs.any()): return None
@@ -183,7 +157,6 @@ class MiniMindOmni(MiniMindForCausalLM):
                 j += 1
         return out
 
-    # 오디오 패드 토큰 위치에 인코딩된 오디오 특징을 주입
     @torch.compiler.disable
     def inject_audio_features(self, tokens, h, audio_feats, seqlen):
         if audio_feats is None or not self.config.audio_ids:
@@ -206,8 +179,7 @@ class MiniMindOmni(MiniMindForCausalLM):
                     i += 1
             out.append(hb)
         return torch.stack(out)
-
-    # SigLIP 비전 인코더 로드 (추론 전용, 파라미터 동결)
+    
     @staticmethod
     def load_vision(path):
         if path is None or not os.path.exists(path):
@@ -223,7 +195,6 @@ class MiniMindOmni(MiniMindForCausalLM):
             p.requires_grad = False
         return model.eval(), processor
 
-    # 이미지 입력에서 비전 인코더를 통해 임베딩 추출
     @torch.compiler.disable
     def get_image_embeddings(self, image_inputs):
         if hasattr(image_inputs, 'keys'):
@@ -236,7 +207,6 @@ class MiniMindOmni(MiniMindForCausalLM):
             outputs = self.vision_encoder(**image_inputs)
         return outputs.last_hidden_state
 
-    # 이미지 픽셀 값을 인코딩하고 프로젝션
     @torch.compiler.disable
     def encode_image_inputs(self, pixel_values):
         if pixel_values is None or self.vision_encoder is None: return None
@@ -249,7 +219,6 @@ class MiniMindOmni(MiniMindForCausalLM):
         idx = mask.nonzero().view(-1, 1, 1).expand_as(emb)
         return emb.new_zeros(pixel_values.size(0), *emb.shape[1:]).scatter(0, idx, emb)
 
-    # 이미지 패드 토큰 위치에 비전 임베딩을 주입
     @torch.compiler.disable
     def count_vision_proj(self, tokens, h, vision_tensors=None, seqlen=512):
         if vision_tensors is None or not self.config.image_ids:
@@ -273,7 +242,6 @@ class MiniMindOmni(MiniMindForCausalLM):
             out.append(hb)
         return torch.stack(out)
 
-    # 순전파: Thinker(텍스트 처리) + Talker(오디오 코드 생성) 병렬 실행
     def forward(self, input_ids, attention_mask=None, past_key_values=None, use_cache=False, logits_to_keep=0, audio_inputs=None, audio_lens=None, pixel_values=None, **args):
         if len(input_ids.shape) == 2:
             batch_size, seq_length = input_ids.shape
@@ -286,7 +254,7 @@ class MiniMindOmni(MiniMindForCausalLM):
         n_thinker, n_talker = len(self.thinker.layers), len(self.talker.layers)
         past_key_values = past_key_values or ([None] * (n_thinker + n_talker))
         start_pos = past_key_values[0][0].shape[1] if past_key_values[0] is not None else 0
-        # meta 디바이스 초기화에서 손실된 RoPE 버퍼 재계산 (transformers>=5.x)
+        # Recompute RoPE buffers lost during meta-device init (transformers>=5.x)
         if self.thinker.freqs_cos[0, 0] == 0:
             freqs_cos, freqs_sin = precompute_freqs_cis(dim=self.config.head_dim, end=self.config.max_position_embeddings, rope_base=self.config.rope_theta, rope_scaling=self.config.rope_scaling)
             self.thinker.freqs_cos, self.thinker.freqs_sin = freqs_cos.to(input_ids.device), freqs_sin.to(input_ids.device)
@@ -295,14 +263,12 @@ class MiniMindOmni(MiniMindForCausalLM):
             self.talker.freqs_cos, self.talker.freqs_sin = freqs_cos.to(input_ids.device), freqs_sin.to(input_ids.device)
         presents = []
 
-        # ======= Thinker: 텍스트 전용 입력, 텍스트 로짓 출력 =======
+        # ======= Thinker: text-only input, output text logits =======
         hidden_states = self.thinker.dropout(self.thinker.embed_tokens(text_ids))
         position_embeddings = (self.thinker.freqs_cos[start_pos:start_pos + seq_length], self.thinker.freqs_sin[start_pos:start_pos + seq_length])
-        # 오디오 특징 주입 (첫 번째 순전파에서만)
         if audio_inputs is not None and start_pos == 0:
             audio_features = self.encode_audio_inputs(audio_inputs, audio_lens)
             hidden_states = self.inject_audio_features(text_ids, hidden_states, audio_features, seq_length)
-        # 비전 특징 주입 (첫 번째 순전파에서만)
         if pixel_values is not None and start_pos == 0:
             if hasattr(pixel_values, 'keys'):
                 img_emb = self.get_image_embeddings(pixel_values).to(hidden_states.dtype)
@@ -320,21 +286,18 @@ class MiniMindOmni(MiniMindForCausalLM):
                 ], dim=stack_dim)
             hidden_states = self.count_vision_proj(tokens=text_ids, h=hidden_states, vision_tensors=vision_tensors, seqlen=seq_length)
         bridge_states = hidden_states
-        # Thinker 레이어 순전파, 브릿지 레이어에서 상태 저장
         for i, (layer, past_key_value) in enumerate(zip(self.thinker.layers, past_key_values[:n_thinker])):
             hidden_states, present = layer(hidden_states, position_embeddings, past_key_value=past_key_value, use_cache=use_cache, attention_mask=attention_mask)
             presents.append(present)
             if i == self.config.bridge_layer: bridge_states = hidden_states
         h_thinker = self.thinker.norm(hidden_states)
 
-        # ======= Talker: Thinker 은닉 상태 + 오디오 코드, 오디오 로짓 출력 =======
+        # ======= Talker: thinker hidden + audio codes, output audio logits =======
         talker_emb = self.talker.embed_tokens(audio_ids)
         spk_emb = args.get('spk_emb', None)
-        # 스피커 임베딩이 있으면 spk 토큰 위치에 주입
         if spk_emb is not None:
             spk_mask = (audio_ids[:, 0, :] == self.audio_spk_token).unsqueeze(-1)
             talker_emb = torch.where(spk_mask, self.talker.spk_proj(spk_emb).unsqueeze(1), talker_emb)
-        # 텍스트 스케일과 오디오 스케일로 가중 합산
         hidden_states = self.talker.embed_proj(bridge_states) * self.talker.text_scale + self.talker.codec_proj(talker_emb) * self.talker.audio_scale
         talker_pos_emb = (self.talker.freqs_cos[start_pos:start_pos + seq_length], self.talker.freqs_sin[start_pos:start_pos + seq_length])
         for layer, past_key_value in zip(self.talker.layers, past_key_values[n_thinker:]):
@@ -344,16 +307,14 @@ class MiniMindOmni(MiniMindForCausalLM):
 
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
         aux_loss = sum(l.mlp.aux_loss for l in list(self.thinker.layers) + list(self.talker.layers) if isinstance(l.mlp, MOEFeedForward))
-        # 더미 그래디언트: 미사용 파라미터에도 그래디언트 전파
-        aux_loss += sum(p.sum() for p in self.audio_proj.parameters()) * 0 + sum(p.sum() for p in self.vision_proj.parameters()) * 0 + sum(p.sum() for p in self.talker.lm_head.adapters.parameters()) * 0 + sum(p.sum() for p in self.talker.spk_proj.parameters()) * 0
+        aux_loss += sum(p.sum() for p in self.audio_proj.parameters()) * 0 + sum(p.sum() for p in self.vision_proj.parameters()) * 0 + sum(p.sum() for p in self.talker.lm_head.adapters.parameters()) * 0 + sum(p.sum() for p in self.talker.spk_proj.parameters()) * 0 # dummy gradient
         text_logits = self.thinker.lm_head(h_thinker[:, slice_indices, :])
         audio_logits = self.talker.lm_head(h_talker[:, slice_indices, :])
-
+        
         out = MoeCausalLMOutputWithPast(aux_loss=aux_loss, logits=text_logits, past_key_values=presents)
         out.audio_logits = audio_logits
         return out
 
-    # 텍스트+오디오 동시 생성. 스트리밍 모드 지원
     @torch.inference_mode()
     def generate(self, input_ids, eos_token_id=2, max_new_tokens=1024, temperature=0.75, top_p=0.90,
                  stream=False, rp=1., use_cache=True, return_audio_codes=False, **args):
@@ -362,7 +323,6 @@ class MiniMindOmni(MiniMindForCausalLM):
         tokens = list(self.stream_generate(input_ids, eos_token_id, max_new_tokens, temperature, top_p, rp, use_cache, return_audio_codes, **args))
         return tokens[-1] if tokens else input_ids
 
-    # 스트리밍 생성: 텍스트 토큰과 오디오 코드를 한 스텝씩 yield
     def stream_generate(self, input_ids, eos_token_id, max_new_tokens, temperature, top_p, rp, use_cache, return_audio_codes=False, **args):
         start_pos, past_kvs, text_finished, first_finished = input_ids.shape[1], None, False, True
         audio_codes = [[] for _ in range(8)]
@@ -374,7 +334,6 @@ class MiniMindOmni(MiniMindForCausalLM):
         spk_reserve = 1 if spk_emb is not None else 0
         fill_end = start_pos
         fill_start = max(spk_reserve, start_pos - ref_len)
-        # 참조 오디오 코드를 버퍼에 오른쪽 정렬로 채움
         if ref_codes is not None and fill_start < fill_end:
             audio_buffer[:, :, fill_start:fill_end] = ref_codes[:, :, -(fill_end - fill_start):]
         if spk_emb is not None and fill_start > 0:
@@ -387,7 +346,6 @@ class MiniMindOmni(MiniMindForCausalLM):
                 out = self.forward(torch.cat((audio_buffer[:, :, -1:], input_ids[:, -1:].unsqueeze(1)), dim=1), past_key_values=past_kvs, use_cache=use_cache, **args)
             past_kvs = out.past_key_values
 
-            # 텍스트 토큰 샘플링
             logits = out.logits[0, -1, :].clone() / (temperature + 1e-9)
             if rp != 1.0:
                 seen = list(set(input_ids[0].tolist())); score = logits[seen]; logits[seen] = torch.where(score > 0, score / rp, score * rp)
@@ -402,13 +360,12 @@ class MiniMindOmni(MiniMindForCausalLM):
                 text_token = args.get('enter_token_id', 201) if first_finished else args.get('pad_token_id', 0)
                 first_finished = False
 
-            step = input_ids.shape[1] - start_pos  # 생성된 토큰 수 (0=첫 번째, 모델이 프롬프트 마지막 토큰 처리)
-            audio_step = step - 1  # 1스텝 지연: 첫 번째 텍스트 출력 시 오디오 없음, 두 번째 텍스트 출력 시 layer0 시작
+            step = input_ids.shape[1] - start_pos  # 已生成token数（0=首次，此时模型处理prompt末尾token）
+            audio_step = step - 1  # 延迟1步：输出第1个text时无audio，输出第2个text时layer0开始
             if generated_tokens is not None:
                 generated_tokens.append(text_token)
                 if not think_end_step and generated_tokens[-len(self.config.think_end_ids):] == list(self.config.think_end_ids): think_end_step = step + 2
                 audio_step = (step - think_end_step) if think_end_step else -1
-            # 각 오디오 레이어에서 코드 샘플링
             for i, al in enumerate(out.audio_logits):
                 if audio_step < i:
                     audio_codes[i].append(self.audio_pad_token)
@@ -420,14 +377,12 @@ class MiniMindOmni(MiniMindForCausalLM):
                     audio_codes[i].append(code)
                     if audio_stop_pos[i] is None and code >= 2048: audio_stop_pos[i] = len(audio_codes[i]) - 1
 
-            # 텍스트와 모든 오디오 레이어가 완료되면 종료
             if text_finished and all(audio_stop_pos[i] is not None for i in range(8)): break
 
             input_ids = torch.cat((input_ids, torch.tensor([[text_token]], device=input_ids.device)), dim=1)
             audio_buffer = torch.cat((audio_buffer, torch.full((1, 8, 1), self.audio_pad_token, dtype=torch.long, device=input_ids.device)), dim=2)
             for i in range(min(audio_step + 1, 8)): audio_buffer[0, i, -1] = audio_codes[i][-1]
 
-            # 8개 레이어 모두 활성화된 경우에만 오디오 프레임 반환
             audio_frame = None
             if return_audio_codes and audio_step >= 7:
                 frame = [audio_codes[i][step - 7 + i] for i in range(8)]
@@ -440,10 +395,8 @@ class MiniMindOmni(MiniMindForCausalLM):
                 yield None, audio_frame
 
 
-# ==== 실시간 VAD (모델 본체와 완전 분리, 순수 엔지니어링 레이어) ====
-# Silero VAD: ONNX 기반 음성 활동 감지
+# ==== Realtime VAD (与模型本体零耦合，纯工程层) ====
 class SileroVAD:
-    # 기능: SileroVAD 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, path):
         opts = ort.SessionOptions()
         opts.inter_op_num_threads = opts.intra_op_num_threads = 1
@@ -451,31 +404,25 @@ class SileroVAD:
         self.session = ort.InferenceSession(path, providers=["CPUExecutionProvider"], sess_options=opts)
         self.h, self.c = np.zeros((2, 1, 64), dtype=np.float32), np.zeros((2, 1, 64), dtype=np.float32)
 
-    # 기능: reset 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def reset(self):
         self.h[:], self.c[:] = 0, 0
 
-    # 기능: SileroVAD의 forward 경로에서 해당 모듈의 주요 연산을 계산합니다.
     def __call__(self, chunk, sr=16000):
         out, self.h, self.c = self.session.run(None, {"input": chunk.reshape(1, -1).astype(np.float32), "h": self.h, "c": self.c, "sr": np.array(sr, dtype="int64")})
         return float(out[0][0])
 
 
-# 실시간 세션: VAD 기반 발화 감지 + 인터럽트 처리를 위한 세션 관리
 class RealtimeSession:
-    # 기능: RealtimeSession 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, vad_path, sr=16000, threshold=0.8, min_speech_ms=128, min_silence_ms=800):
         self.vad, self.sr, self.threshold = SileroVAD(vad_path), sr, threshold
         self.min_speech, self.min_silence = int(sr * min_speech_ms / 1000), int(sr * min_silence_ms / 1000)
         self.reset()
 
-    # 기능: reset 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def reset(self):
         self.vad.reset()
         self.buffer, self.ring, self.speaking, self.generating, self.interrupt = [], [], False, False, False
         self.speech_samples = self.silence_samples = self.tail_silence = 0
 
-    # 오디오 청크를 푸시하고 VAD 상태 업데이트. 'speech_end', 'interrupt', 'listening' 반환
     def push_chunk(self, chunk, W=1024):
         for i in range(0, max(len(chunk), 1), W):
             w = chunk[i:i + W]
@@ -509,7 +456,6 @@ class RealtimeSession:
                 self.ring = [w]
         return 'listening'
 
-    # 버퍼에 저장된 오디오를 하나의 배열로 결합하여 반환
     def get_audio(self):
         audio = np.concatenate(self.buffer) if self.buffer else np.array([], dtype=np.float32)
         self.buffer.clear()

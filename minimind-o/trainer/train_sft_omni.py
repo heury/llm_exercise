@@ -22,8 +22,8 @@ from trainer.trainer_utils import get_lr, Logger, is_main_process, init_distribu
 warnings.filterwarnings('ignore')
 
 
-# 기능: omni_collate_fn 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def omni_collate_fn(batch):
+    """自定义collate函数，处理变长audio_inputs和pixel_values"""
     input_ids, labels, audio_labels, audio_inputs, audio_lens, pixel_values, spk_emb = zip(*batch)
     input_ids = torch.stack(input_ids)
     labels = torch.stack(labels)
@@ -49,7 +49,6 @@ def omni_collate_fn(batch):
     return input_ids, labels, audio_labels, audio_inputs, audio_lens, pixel_values, spk_emb
 
 
-# 기능: train_epoch 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def train_epoch(epoch, loader, iters, start_step=0, wandb=None):
     start_time = time.time()
     last_step = start_step
@@ -124,8 +123,8 @@ def train_epoch(epoch, loader, iters, start_step=0, wandb=None):
             raw_model = getattr(raw_model, '_orig_mod', raw_model)
             clean_state_dict = {k: v for k, v in raw_model.state_dict().items() if not k.startswith('audio_encoder.')}
             torch.save({k: v.half().cpu() for k, v in clean_state_dict.items()}, ckp)
-            omni_checkpoint(omni_config, weight=args.save_weight, model=model, optimizer=optimizer,
-                          epoch=epoch, step=step, wandb=wandb, save_dir='../../minimind_out/checkpoints', scaler=scaler)
+            omni_checkpoint(omni_config, weight=args.save_weight, model=model, optimizer=optimizer, 
+                          epoch=epoch, step=step, wandb=wandb, save_dir='../checkpoints', scaler=scaler)
             model.train()
 
         del input_ids, labels, audio_labels, audio_inputs, audio_lens, pixel_values, spk_emb, res, loss
@@ -140,7 +139,7 @@ def train_epoch(epoch, loader, iters, start_step=0, wandb=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind-O SFT")
-    parser.add_argument("--save_dir", type=str, default="../../minimind_out", help="模型保存目录")
+    parser.add_argument("--save_dir", type=str, default="../out", help="模型保存目录")
     parser.add_argument('--save_weight', default='sft_omni', type=str, help="保存权重的前缀名")
     parser.add_argument("--epochs", type=int, default=15, help="训练轮数")
     parser.add_argument("--batch_size", type=int, default=32, help="batch size")
@@ -156,9 +155,9 @@ if __name__ == "__main__":
     parser.add_argument('--num_hidden_layers', default=8, type=int, help="隐藏层数量")
     parser.add_argument('--max_seq_len', default=512, type=int, help="训练的最大截断长度")
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="是否使用MoE架构")
-    parser.add_argument("--data_path", type=str, default="../../minimind_dataset/train_t2a_mini.parquet", help="训练数据路径（parquet格式）")
-    parser.add_argument("--audio_encoder_dir", type=str, default="../../minimind_model/SenseVoiceSmall", help="音频encoder路径(SenseVoice)")
-    parser.add_argument("--vision_dir", type=str, default="../../minimind_model/siglip2-base-p32-256-ve", help="CLIP视觉模型路径")
+    parser.add_argument("--data_path", type=str, default="../dataset/train_t2a_mini.parquet", help="训练数据路径（parquet格式）")
+    parser.add_argument("--audio_encoder_dir", type=str, default="../model/SenseVoiceSmall", help="音频encoder路径(SenseVoice)")
+    parser.add_argument("--vision_dir", type=str, default="../model/siglip2-base-p32-256-ve", help="CLIP视觉模型路径")
     parser.add_argument('--from_weight', default='llm', type=str, help="基于哪个权重训练，为none则不基于任何权重训练")
     parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="是否自动检测&续训（0=否，1=是）")
     parser.add_argument('--freeze_backbone', default='none', type=str, choices=['none', 'all', 'last1'], help="冻结主干模型: none=全量训练, all=只训练audio层, last1=只训练最后1层+audio层")
@@ -168,27 +167,27 @@ if __name__ == "__main__":
     parser.add_argument("--use_compile", default=0, type=int, choices=[0, 1], help="是否使用torch.compile加速（0=否，1=是）")
     args = parser.parse_args()
 
-# ========== 1. 환경과 난수 시드 초기화 ==========
+    # ========== 1. 初始化环境和随机种子 ==========
     local_rank = init_distributed_mode()
     if dist.is_initialized(): 
         args.device = f"cuda:{local_rank}"
     setup_seed(42 + (dist.get_rank() if dist.is_initialized() else 0))
     
-# ========== 2. 디렉터리와 모델 파라미터 설정 및 체크포인트 확인 ==========
+    # ========== 2. 配置目录、模型参数、检查ckp ==========
     os.makedirs(args.save_dir, exist_ok=True)
     omni_config = OmniConfig(
         hidden_size=args.hidden_size, 
         num_hidden_layers=args.num_hidden_layers, 
         use_moe=bool(args.use_moe)
     )
-    ckp_data = omni_checkpoint(omni_config, weight=args.save_weight, save_dir='../../minimind_out/checkpoints') if args.from_resume==1 else None
+    ckp_data = omni_checkpoint(omni_config, weight=args.save_weight, save_dir='../checkpoints') if args.from_resume==1 else None
     
-# ========== 3. 혼합 정밀도 설정 ==========
+    # ========== 3. 设置混合精度 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"
     dtype = torch.bfloat16 if args.dtype == "bfloat16" else torch.float16
     autocast_ctx = nullcontext() if device_type == "cpu" else torch.cuda.amp.autocast(dtype=dtype)
     
-# ========== 4. wandb 설정 ==========
+    # ========== 4. 配wandb ==========
     wandb = None
     if args.use_wandb and is_main_process():
         import swanlab as wandb
@@ -197,7 +196,7 @@ if __name__ == "__main__":
         wandb_run_name = f"MiniMind-O-SFT-Epoch-{args.epochs}-BatchSize-{args.batch_size}-LR-{args.learning_rate}"
         wandb.init(project=args.wandb_project, name=wandb_run_name, id=wandb_id, resume=resume)
     
-# ========== 5. 모델, 데이터, 옵티마이저 정의 ==========
+    # ========== 5. 定义模型、数据、优化器 ==========
     model, tokenizer = init_omni_model(omni_config, from_weight=args.from_weight,
                                         audio_encoder_path=args.audio_encoder_dir,
                                         vision_model_path=args.vision_dir,
@@ -220,7 +219,7 @@ if __name__ == "__main__":
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6
     Logger(f'Trainable: {trainable:.2f}M | Mode: {args.mode} | Freeze: {args.freeze_backbone} | Compile: {"on" if args.use_compile else "off"}')
     
-    # scheduled_sampling은 image/audio 토큰의 연속성을 자동으로 보호
+    # scheduled_sampling 现在会自动保护 image/audio token 的连续性
     train_ds = OmniDataset(
         args.data_path, 
         tokenizer, 
@@ -234,7 +233,7 @@ if __name__ == "__main__":
     scaler = torch.cuda.amp.GradScaler(enabled=(args.dtype == 'float16'))
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
     
-# ========== 6. 체크포인트에서 상태 복원 ==========
+    # ========== 6. 从ckp恢复状态 ==========
     start_epoch, start_step = 0, 0
     if ckp_data:
         model.load_state_dict(ckp_data['model'], strict=False)
@@ -243,11 +242,11 @@ if __name__ == "__main__":
         start_epoch = ckp_data['epoch']
         start_step = ckp_data.get('step', 0)
     
-# ========== 7. 컴파일 및 분산 래핑 ==========
+    # ========== 7. DDP包模型 ==========
     if dist.is_initialized():
         model = DistributedDataParallel(model, device_ids=[local_rank])
     
-# ========== 8. 학습 시작 ==========
+    # ========== 8. 开始训练 ==========
     for epoch in range(start_epoch, args.epochs):
         train_sampler and train_sampler.set_epoch(epoch)
         setup_seed(42 + epoch); indices = torch.randperm(len(train_ds)).tolist()
@@ -260,6 +259,6 @@ if __name__ == "__main__":
         else:
             train_epoch(epoch, loader, len(loader), 0, wandb)
     
-# ========== 9. 분산 프로세스 정리 ==========
+    # ========== 9. 清理分布进程 ==========
     if dist.is_initialized(): dist.destroy_process_group()
 
