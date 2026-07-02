@@ -1,4 +1,3 @@
-# OpenAI 호환 API를 통한 MiniMind 채팅 클라이언트 스크립트
 from openai import OpenAI
 
 client = OpenAI(
@@ -8,7 +7,7 @@ client = OpenAI(
 stream = True
 conversation_history_origin = []
 conversation_history = conversation_history_origin.copy()
-history_messages_num = 0  # 반드시 짝수로 설정 (Q+A), 0이면 대화 기록 미포함
+history_messages_num = 0  # 必须设置为偶数（Q+A），为0则不携带历史对话
 while True:
     query = input('[Q]: ')
     conversation_history.append({"role": "user", "content": query})
@@ -19,16 +18,22 @@ while True:
         temperature=0.8,
         max_tokens=2048,
         top_p=0.8,
-        extra_body={"chat_template_kwargs": {"open_thinking": True}, "reasoning_effort": "medium"} # 사고 모드 스위치
+        extra_body={"chat_template_kwargs": {"open_thinking": True}, "reasoning_effort": "medium"} # 思考开关
     )
     if not stream:
+        if not response.choices or response.choices[0].message is None:
+            raise ValueError("LLM returned empty or filtered response")
         assistant_res = response.choices[0].message.content
         print('[A]: ', assistant_res)
     else:
         print('[A]: ', end='', flush=True)
         assistant_res = ''
         for chunk in response:
+            if not chunk.choices:
+                continue
             delta = chunk.choices[0].delta
+            if delta is None:
+                continue
             r = getattr(delta, 'reasoning_content', None) or ""
             c = delta.content or ""
             if r:

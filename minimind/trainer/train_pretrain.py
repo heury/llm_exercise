@@ -1,6 +1,3 @@
-# 사전학습(Pretrain) 스크립트: MiniMind 모델의 언어 모델링 사전학습을 수행한다.
-# DDP 분산 학습, 혼합 정밀도, 체크포인트 저장/복원, wandb 로깅을 지원한다.
-
 import os
 import sys
 
@@ -24,7 +21,6 @@ from trainer.trainer_utils import get_lr, Logger, is_main_process, lm_checkpoint
 warnings.filterwarnings('ignore')
 
 
-# 한 에포크의 학습 루프를 실행한다. 그래디언트 누적, 로깅, 체크포인트 저장을 처리한다.
 def train_epoch(epoch, loader, iters, start_step=0, wandb=None):
     start_time = time.time()
     last_step = start_step
@@ -70,7 +66,7 @@ def train_epoch(epoch, loader, iters, start_step=0, wandb=None):
             raw_model = getattr(raw_model, '_orig_mod', raw_model)
             state_dict = raw_model.state_dict()
             torch.save({k: v.half().cpu() for k, v in state_dict.items()}, ckp)
-            lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer, scaler=scaler, epoch=epoch, step=step, wandb=wandb, save_dir='../../minimind_out/checkpoints')
+            lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer, scaler=scaler, epoch=epoch, step=step, wandb=wandb, save_dir='../checkpoints')
             model.train()
             del state_dict
 
@@ -86,46 +82,46 @@ def train_epoch(epoch, loader, iters, start_step=0, wandb=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind Pretraining")
-    parser.add_argument("--save_dir", type=str, default="../../minimind_out", help="모델 저장 디렉토리")
-    parser.add_argument('--save_weight', default='pretrain', type=str, help="저장 가중치 접두사 이름")
-    parser.add_argument("--epochs", type=int, default=2, help="학습 에포크 수")
-    parser.add_argument("--batch_size", type=int, default=32, help="배치 크기")
-    parser.add_argument("--learning_rate", type=float, default=5e-4, help="초기 학습률")
-    parser.add_argument("--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu", help="학습 장치")
-    parser.add_argument("--dtype", type=str, default="bfloat16", help="혼합 정밀도 타입")
-    parser.add_argument("--num_workers", type=int, default=8, help="데이터 로딩 워커 수")
-    parser.add_argument("--accumulation_steps", type=int, default=8, help="그래디언트 누적 스텝 수")
-    parser.add_argument("--grad_clip", type=float, default=1.0, help="그래디언트 클리핑 임계값")
-    parser.add_argument("--log_interval", type=int, default=100, help="로그 출력 간격")
-    parser.add_argument("--save_interval", type=int, default=1000, help="모델 저장 간격")
-    parser.add_argument('--hidden_size', default=768, type=int, help="히든 레이어 차원")
-    parser.add_argument('--num_hidden_layers', default=8, type=int, help="히든 레이어 수")
-    parser.add_argument('--max_seq_len', default=340, type=int, help="학습 최대 시퀀스 길이 (중국어 1토큰 약 1.5~1.7자)")
-    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부 (0=아니오, 1=예)")
-    parser.add_argument("--data_path", type=str, default="../../minimind_dataset/pretrain_t2t_mini.jsonl", help="사전학습 데이터 경로")
-    parser.add_argument('--from_weight', default='none', type=str, help="학습 기반 가중치, none이면 처음부터 학습")
-    parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="자동 감지 및 이어서 학습 여부 (0=아니오, 1=예)")
-    parser.add_argument("--use_wandb", action="store_true", help="wandb 사용 여부")
-    parser.add_argument("--wandb_project", type=str, default="MiniMind-Pretrain", help="wandb 프로젝트 이름")
-    parser.add_argument("--use_compile", default=0, type=int, choices=[0, 1], help="torch.compile 가속 사용 여부 (0=아니오, 1=예)")
+    parser.add_argument("--save_dir", type=str, default="../out", help="模型保存目录")
+    parser.add_argument('--save_weight', default='pretrain', type=str, help="保存权重的前缀名")
+    parser.add_argument("--epochs", type=int, default=2, help="训练轮数")
+    parser.add_argument("--batch_size", type=int, default=32, help="batch size")
+    parser.add_argument("--learning_rate", type=float, default=5e-4, help="初始学习率")
+    parser.add_argument("--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu", help="训练设备")
+    parser.add_argument("--dtype", type=str, default="bfloat16", help="混合精度类型")
+    parser.add_argument("--num_workers", type=int, default=8, help="数据加载线程数")
+    parser.add_argument("--accumulation_steps", type=int, default=8, help="梯度累积步数")
+    parser.add_argument("--grad_clip", type=float, default=1.0, help="梯度裁剪阈值")
+    parser.add_argument("--log_interval", type=int, default=100, help="日志打印间隔")
+    parser.add_argument("--save_interval", type=int, default=1000, help="模型保存间隔")
+    parser.add_argument('--hidden_size', default=768, type=int, help="隐藏层维度")
+    parser.add_argument('--num_hidden_layers', default=8, type=int, help="隐藏层数量")
+    parser.add_argument('--max_seq_len', default=340, type=int, help="训练的最大截断长度（中文1token≈1.5~1.7字符）")
+    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="是否使用MoE架构（0=否，1=是）")
+    parser.add_argument("--data_path", type=str, default="../dataset/pretrain_t2t_mini.jsonl", help="预训练数据路径")
+    parser.add_argument('--from_weight', default='none', type=str, help="基于哪个权重训练，为none则从头开始")
+    parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="是否自动检测&续训（0=否，1=是）")
+    parser.add_argument("--use_wandb", action="store_true", help="是否使用wandb")
+    parser.add_argument("--wandb_project", type=str, default="MiniMind-Pretrain", help="wandb项目名")
+    parser.add_argument("--use_compile", default=0, type=int, choices=[0, 1], help="是否使用torch.compile加速（0=否，1=是）")
     args = parser.parse_args()
 
-    # ========== 1. 환경 초기화 및 랜덤 시드 설정 ==========
+    # ========== 1. 初始化环境和随机种子 ==========
     local_rank = init_distributed_mode()
     if dist.is_initialized(): args.device = f"cuda:{local_rank}"
     setup_seed(42 + (dist.get_rank() if dist.is_initialized() else 0))
     
-    # ========== 2. 디렉토리 설정, 모델 파라미터, 체크포인트 확인 ==========
+    # ========== 2. 配置目录、模型参数、检查ckp ==========
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config = MiniMindConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers, use_moe=bool(args.use_moe))
-    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../../minimind_out/checkpoints') if args.from_resume==1 else None
+    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../checkpoints') if args.from_resume==1 else None
     
-    # ========== 3. 혼합 정밀도 설정 ==========
+    # ========== 3. 设置混合精度 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"
     dtype = torch.bfloat16 if args.dtype == "bfloat16" else torch.float16
     autocast_ctx = nullcontext() if device_type == "cpu" else torch.cuda.amp.autocast(dtype=dtype)
     
-    # ========== 4. wandb 설정 ==========
+    # ========== 4. 配wandb ==========
     wandb = None
     if args.use_wandb and is_main_process():
         import swanlab as wandb
@@ -134,14 +130,14 @@ if __name__ == "__main__":
         wandb_run_name = f"MiniMind-Pretrain-Epoch-{args.epochs}-BatchSize-{args.batch_size}-LearningRate-{args.learning_rate}"
         wandb.init(project=args.wandb_project, name=wandb_run_name, id=wandb_id, resume=resume)
     
-    # ========== 5. 모델, 데이터, 옵티마이저 정의 ==========
+    # ========== 5. 定义模型、数据、优化器 ==========
     model, tokenizer = init_model(lm_config, args.from_weight, device=args.device)
     train_ds = PretrainDataset(args.data_path, tokenizer, max_length=args.max_seq_len)
     train_sampler = DistributedSampler(train_ds) if dist.is_initialized() else None
     scaler = torch.cuda.amp.GradScaler(enabled=(args.dtype == 'float16'))
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
     
-    # ========== 6. 체크포인트에서 상태 복원 ==========
+    # ========== 6. 从ckp恢复状态 ==========
     start_epoch, start_step = 0, 0
     if ckp_data:
         model.load_state_dict(ckp_data['model'])
@@ -150,14 +146,14 @@ if __name__ == "__main__":
         start_epoch = ckp_data['epoch']
         start_step = ckp_data.get('step', 0)
     
-    # ========== 7. 컴파일 및 분산 학습 래핑 ==========
+    # ========== 7. 编译和分布式包装 ==========
     if args.use_compile == 1:
         model = torch.compile(model)
         Logger('torch.compile enabled')
     if dist.is_initialized():
         model = DistributedDataParallel(model, device_ids=[local_rank])
     
-    # ========== 8. 학습 시작 ==========
+    # ========== 8. 开始训练 ==========
     for epoch in range(start_epoch, args.epochs):
         train_sampler and train_sampler.set_epoch(epoch)
         setup_seed(42 + epoch); indices = torch.randperm(len(train_ds)).tolist()
@@ -165,12 +161,12 @@ if __name__ == "__main__":
         batch_sampler = SkipBatchSampler(train_sampler or indices, args.batch_size, skip)
         loader = DataLoader(train_ds, batch_sampler=batch_sampler, num_workers=args.num_workers, pin_memory=True)
         if skip > 0: 
-            Logger(f'Epoch [{epoch + 1}/{args.epochs}]: 처음 {start_step}개 step 건너뛰고 step {start_step + 1}부터 시작')
+            Logger(f'Epoch [{epoch + 1}/{args.epochs}]: 跳过前{start_step}个step，从step {start_step + 1}开始')
             train_epoch(epoch, loader, len(loader) + skip, start_step, wandb)
         else:
             train_epoch(epoch, loader, len(loader), 0, wandb)
     
-    # ========== 9. 분산 프로세스 정리 ==========
+    # ========== 9. 清理分布进程 ==========
     if dist.is_initialized():
         dist.barrier()
         dist.destroy_process_group()

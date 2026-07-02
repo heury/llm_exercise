@@ -1,10 +1,3 @@
-"""
-LoRA (Low-Rank Adaptation) 파인튜닝 스크립트.
-
-사전학습된 모델에 LoRA 어댑터를 적용하고,
-비-LoRA 파라미터를 동결한 채로 효율적 파인튜닝을 수행한다.
-"""
-
 import os
 import sys
 
@@ -29,7 +22,6 @@ from trainer.trainer_utils import get_lr, Logger, is_main_process, lm_checkpoint
 warnings.filterwarnings('ignore')
 
 
-# 한 에폭 동안 LoRA 파인튜닝 학습을 수행한다.
 def train_epoch(epoch, loader, iters, lora_params, start_step=0, wandb=None):
     start_time = time.time()
     last_step = start_step
@@ -69,9 +61,9 @@ def train_epoch(epoch, loader, iters, lora_params, start_step=0, wandb=None):
             model.eval()
             moe_suffix = '_moe' if lm_config.use_moe else ''
             lora_save_path = f'{args.save_dir}/{args.lora_name}_{lm_config.hidden_size}{moe_suffix}.pth'
-            # LoRA 가중치만 저장
+            # LoRA只保存LoRA权重
             save_lora(model, lora_save_path)
-            lm_checkpoint(lm_config, weight=args.lora_name, model=model, optimizer=optimizer, scaler=scaler, epoch=epoch, step=step, wandb=wandb, save_dir='../../minimind_out/checkpoints')
+            lm_checkpoint(lm_config, weight=args.lora_name, model=model, optimizer=optimizer, scaler=scaler, epoch=epoch, step=step, wandb=wandb, save_dir='../checkpoints')
             model.train()
 
         del input_ids, labels, res, loss
@@ -85,46 +77,46 @@ def train_epoch(epoch, loader, iters, lora_params, start_step=0, wandb=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind LoRA Fine-tuning")
-    parser.add_argument("--save_dir", type=str, default="../../minimind_out", help="모델 저장 디렉터리")
-    parser.add_argument("--lora_name", type=str, default="lora_medical", help="LoRA 가중치 이름 (예: lora_identity/lora_medical 등)")
-    parser.add_argument("--epochs", type=int, default=10, help="학습 에폭 수")
-    parser.add_argument("--batch_size", type=int, default=32, help="배치 크기")
-    parser.add_argument("--learning_rate", type=float, default=1e-4, help="초기 학습률")
-    parser.add_argument("--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu", help="학습 디바이스")
-    parser.add_argument("--dtype", type=str, default="bfloat16", help="혼합 정밀도 타입")
-    parser.add_argument("--num_workers", type=int, default=8, help="데이터 로딩 스레드 수")
-    parser.add_argument("--accumulation_steps", type=int, default=1, help="그래디언트 누적 스텝 수")
-    parser.add_argument("--grad_clip", type=float, default=1.0, help="그래디언트 클리핑 임계값")
-    parser.add_argument("--log_interval", type=int, default=10, help="로그 출력 간격")
-    parser.add_argument("--save_interval", type=int, default=1000, help="모델 저장 간격")
-    parser.add_argument('--hidden_size', default=768, type=int, help="은닉층 차원")
-    parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 개수")
-    parser.add_argument('--max_seq_len', default=340, type=int, help="학습 최대 절단 길이 (한국어 1토큰 약 1.5~1.7자)")
-    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부 (0=아니오, 1=예)")
-    parser.add_argument("--data_path", type=str, default="../../minimind_dataset/lora_medical.jsonl", help="LoRA 학습 데이터 경로")
-    parser.add_argument('--from_weight', default='full_sft', type=str, help="학습 기반 가중치, 기본값 full_sft")
-    parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="자동 감지 및 이어서 학습 여부 (0=아니오, 1=예)")
-    parser.add_argument("--use_wandb", action="store_true", help="wandb 사용 여부")
-    parser.add_argument("--wandb_project", type=str, default="MiniMind-LoRA", help="wandb 프로젝트 이름")
-    parser.add_argument("--use_compile", default=0, type=int, choices=[0, 1], help="torch.compile 가속 사용 여부 (0=아니오, 1=예)")
+    parser.add_argument("--save_dir", type=str, default="../out", help="模型保存目录")
+    parser.add_argument("--lora_name", type=str, default="lora_medical", help="LoRA权重名称(如lora_identity/lora_medical等)")
+    parser.add_argument("--epochs", type=int, default=10, help="训练轮数")
+    parser.add_argument("--batch_size", type=int, default=32, help="batch size")
+    parser.add_argument("--learning_rate", type=float, default=1e-4, help="初始学习率")
+    parser.add_argument("--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu", help="训练设备")
+    parser.add_argument("--dtype", type=str, default="bfloat16", help="混合精度类型")
+    parser.add_argument("--num_workers", type=int, default=8, help="数据加载线程数")
+    parser.add_argument("--accumulation_steps", type=int, default=1, help="梯度累积步数")
+    parser.add_argument("--grad_clip", type=float, default=1.0, help="梯度裁剪阈值")
+    parser.add_argument("--log_interval", type=int, default=10, help="日志打印间隔")
+    parser.add_argument("--save_interval", type=int, default=1000, help="模型保存间隔")
+    parser.add_argument('--hidden_size', default=768, type=int, help="隐藏层维度")
+    parser.add_argument('--num_hidden_layers', default=8, type=int, help="隐藏层数量")
+    parser.add_argument('--max_seq_len', default=340, type=int, help="训练的最大截断长度（中文1token≈1.5~1.7字符）")
+    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="是否使用MoE架构（0=否，1=是）")
+    parser.add_argument("--data_path", type=str, default="../dataset/lora_medical.jsonl", help="LoRA训练数据路径")
+    parser.add_argument('--from_weight', default='full_sft', type=str, help="基于哪个权重训练，默认full_sft")
+    parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="是否自动检测&续训（0=否，1=是）")
+    parser.add_argument("--use_wandb", action="store_true", help="是否使用wandb")
+    parser.add_argument("--wandb_project", type=str, default="MiniMind-LoRA", help="wandb项目名")
+    parser.add_argument("--use_compile", default=0, type=int, choices=[0, 1], help="是否使用torch.compile加速（0=否，1=是）")
     args = parser.parse_args()
 
-# ========== 1. 환경과 난수 시드 초기화 ==========
+    # ========== 1. 初始化环境和随机种子 ==========
     local_rank = init_distributed_mode()
     if dist.is_initialized(): args.device = f"cuda:{local_rank}"
     setup_seed(42 + (dist.get_rank() if dist.is_initialized() else 0))
     
-# ========== 2. 디렉터리와 모델 파라미터 설정 및 체크포인트 확인 ==========
+    # ========== 2. 配置目录、模型参数、检查ckp ==========
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config = MiniMindConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers, use_moe=bool(args.use_moe))
-    ckp_data = lm_checkpoint(lm_config, weight=args.lora_name, save_dir='../../minimind_out/checkpoints') if args.from_resume==1 else None
+    ckp_data = lm_checkpoint(lm_config, weight=args.lora_name, save_dir='../checkpoints') if args.from_resume==1 else None
     
-# ========== 3. 혼합 정밀도 설정 ==========
+    # ========== 3. 设置混合精度 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"
     dtype = torch.bfloat16 if args.dtype == "bfloat16" else torch.float16
     autocast_ctx = nullcontext() if device_type == "cpu" else torch.cuda.amp.autocast(dtype=dtype)
     
-# ========== 4. wandb 설정 ==========
+    # ========== 4. 配wandb ==========
     wandb = None
     if args.use_wandb and is_main_process():
         import swanlab as wandb
@@ -133,18 +125,18 @@ if __name__ == "__main__":
         wandb_run_name = f"MiniMind-LoRA-{args.lora_name}-Epoch-{args.epochs}-BatchSize-{args.batch_size}-LR-{args.learning_rate}"
         wandb.init(project=args.wandb_project, name=wandb_run_name, id=wandb_id, resume=resume)
     
-# ========== 5. 모델 정의, LoRA 적용, 비-LoRA 파라미터 동결 ==========
+    # ========== 5. 定义模型、应用LoRA、冻结非LoRA参数 ==========
     model, tokenizer = init_model(lm_config, args.from_weight, device=args.device)
     apply_lora(model)
     
-    # 해당 단계의 처리 흐름을 설명
+    # 统计参数
     total_params = sum(p.numel() for p in model.parameters())
     lora_params_count = sum(p.numel() for name, p in model.named_parameters() if 'lora' in name)
     Logger(f"LLM 总参数量: {total_params / 1e6:.3f} M")
     Logger(f"LoRA 参数量: {lora_params_count / 1e6:.3f} M")
     Logger(f"LoRA 参数占比: {lora_params_count / total_params * 100:.2f}%")
     
-    # 비-LoRA 파라미터 동결 및 LoRA 파라미터 수집
+    # 冻结非LoRA参数，收集LoRA参数
     lora_params = []
     for name, param in model.named_parameters():
         if 'lora' in name:
@@ -153,13 +145,13 @@ if __name__ == "__main__":
         else:
             param.requires_grad = False
     
-# ========== 6. 체크포인트에서 상태 복원 ==========
+    # ========== 6. 定义数据和优化器 ==========
     train_ds = SFTDataset(args.data_path, tokenizer, max_length=args.max_seq_len)
     train_sampler = DistributedSampler(train_ds) if dist.is_initialized() else None
     scaler = torch.cuda.amp.GradScaler(enabled=(args.dtype == 'float16'))
     optimizer = optim.AdamW(lora_params, lr=args.learning_rate)
     
-# ========== 7. 컴파일 및 분산 래핑 ==========
+    # ========== 7. 从ckp恢复状态 ==========
     start_epoch, start_step = 0, 0
     if ckp_data:
         model.load_state_dict(ckp_data['model'], strict=False)
@@ -168,14 +160,14 @@ if __name__ == "__main__":
         start_epoch = ckp_data['epoch']
         start_step = ckp_data.get('step', 0)
     
-# ========== 8. 학습 시작 ==========
+    # ========== 8. 编译和分布式包装 ==========
     if args.use_compile == 1:
         args.use_compile = 0
         Logger('[LoRA] monkey-patch forward 与 torch.compile 不兼容，use_compile 已自动关闭')
     if dist.is_initialized():
         model = DistributedDataParallel(model, device_ids=[local_rank])
     
-# ========== 9. 분산 프로세스 정리 ==========
+    # ========== 9. 开始训练 ==========
     for epoch in range(start_epoch, args.epochs):
         train_sampler and train_sampler.set_epoch(epoch)
         setup_seed(42 + epoch); indices = torch.randperm(len(train_ds)).tolist()
@@ -188,7 +180,7 @@ if __name__ == "__main__":
         else:
             train_epoch(epoch, loader, len(loader), lora_params, 0, wandb)
     
-# ========== 10. 분산 프로세스 정리 ==========
+    # ========== 10. 清理分布进程 ==========
     if dist.is_initialized():
         dist.barrier()
         dist.destroy_process_group()

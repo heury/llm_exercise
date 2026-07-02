@@ -1,6 +1,3 @@
-# MiniMind 웹 데모 (Streamlit 기반)
-# 모델 로드, 채팅 UI, 도구 호출, 사고(thinking) 기능을 포함하는 대화형 웹 인터페이스.
-
 import random
 import re
 import json
@@ -16,20 +13,20 @@ st.set_page_config(page_title="MiniMind", initial_sidebar_state="collapsed")
 
 st.markdown("""
     <style>
-        /* 동작 버튼 스타일 */
+        /* 添加操作按钮样式 */
         .stButton button {
-            border-radius: 50% !important;  /* 원형으로 변경 */
-            width: 32px !important;         /* 고정 너비 */
-            height: 32px !important;        /* 고정 높이 */
-            padding: 0 !important;          /* 내부 여백 제거 */
+            border-radius: 50% !important;  /* 改为圆形 */
+            width: 32px !important;         /* 固定宽度 */
+            height: 32px !important;        /* 固定高度 */
+            padding: 0 !important;          /* 移除内边距 */
             background-color: transparent !important;
             border: 1px solid #ddd !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
             font-size: 14px !important;
-            color: #666 !important;         /* 부드러운 색상 */
-            margin: 5px 10px 5px 0 !important;  /* 버튼 간격 조정 */
+            color: #666 !important;         /* 更柔和的颜色 */
+            margin: 5px 10px 5px 0 !important;  /* 调整按钮间距 */
         }
         .stButton button:hover {
             border-color: #999 !important;
@@ -43,9 +40,9 @@ st.markdown("""
             margin-bottom: -35px !important;
         }
         
-        /* 버튼 기본 스타일 초기화 */
+        /* 重置按钮基础样式 */
         .stButton > button {
-            all: unset !important;  /* 모든 기본 스타일 초기화 */
+            all: unset !important;  /* 重置所有默认样式 */
             box-sizing: border-box !important;
             border-radius: 50% !important;
             width: 18px !important;
@@ -64,7 +61,7 @@ st.markdown("""
             color: #888 !important;
             cursor: pointer !important;
             transition: all 0.2s ease !important;
-            margin: 0 2px !important;  /* margin 값 조정 */
+            margin: 0 2px !important;  /* 调整这里的 margin 值 */
         }
 
     </style>
@@ -72,7 +69,7 @@ st.markdown("""
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# 다국어 텍스트
+# 多语言文本
 LANG_TEXTS = {
     'zh': {
         'settings': '模型设定调整',
@@ -102,12 +99,11 @@ LANG_TEXTS = {
     }
 }
 
-# 현재 언어 설정에 맞는 UI 텍스트를 반환한다.
 def get_text(key):
     lang = st.session_state.get('lang', 'en')
     return LANG_TEXTS.get(lang, {}).get(key, LANG_TEXTS['zh'].get(key, key))
 
-# 도구 정의 (중국어 LLM용 - 설명 번역하지 않음)
+# 工具定义
 TOOLS = [
     {"type": "function", "function": {"name": "calculate_math", "description": "计算数学表达式", "parameters": {"type": "object", "properties": {"expression": {"type": "string", "description": "数学表达式"}}, "required": ["expression"]}}},
     {"type": "function", "function": {"name": "get_current_time", "description": "获取当前时间", "parameters": {"type": "object", "properties": {"timezone": {"type": "string", "default": "Asia/Shanghai"}}, "required": []}}},
@@ -125,7 +121,6 @@ TOOL_SHORT_NAMES = {
     'get_exchange_rate': '汇率', 'translate_text': '翻译'
 }
 
-# 도구 이름과 인자를 받아 해당 도구를 실행하고 결과를 반환한다.
 def execute_tool(tool_name, args):
     import datetime
     try:
@@ -151,11 +146,9 @@ def execute_tool(tool_name, args):
         return {"error": str(e)}
 
 
-# 어시스턴트 응답 내용을 처리하여 tool_call 및 thinking 태그를 HTML로 포맷한다.
 def process_assistant_content(content, is_streaming=False):
-    # tool_call 태그 처리 및 포맷 표시
+    # 处理tool_call标签，格式化显示
     if '<tool_call>' in content:
-        # 기능: format_tool_call 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
         def format_tool_call(match):
             try:
                 tc = json.loads(match.group(1))
@@ -166,7 +159,7 @@ def process_assistant_content(content, is_streaming=False):
                 return match.group(0)
         content = re.sub(r'<tool_call>(.*?)</tool_call>', format_tool_call, content, flags=re.DOTALL)
     
-    # 스트리밍 생성 시 사고 모드가 켜져 있으면 처음부터 접기에 넣음
+    # 流式生成且开启思考时，一开始就放到折叠里
     if is_streaming and st.session_state.get('enable_thinking', False) and '</think>' not in content and '<think>' not in content:
         m = re.search(r'(\n\n(?:我是|您好|你好)[^\n]*)', content)
         if m and m.start(1) > 5:
@@ -178,24 +171,20 @@ def process_assistant_content(content, is_streaming=False):
             return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">思考中...</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto; display: flex; flex-direction: column-reverse;"><div style="margin-bottom: auto;">{content.strip().replace(chr(10), "<br>")}</div></div></details>'
 
     if '<think>' in content and '</think>' in content:
-        # 기능: format_think 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
         def format_think(match):
             think_content = match.group(2)
-            if think_content.replace('\n', '').strip():
-                # 전체가 줄바꿈만 있는 경우는 제외
+            if think_content.replace('\n', '').strip():  # 不是全换行
                 return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">已思考</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto;">{think_content.strip()}</div></details>'
             return ''
         content = re.sub(r'(<think>)(.*?)(</think>)', format_think, content, flags=re.DOTALL)
 
     if '<think>' in content and '</think>' not in content:
-        # 기능: format_think_in_progress 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
         def format_think_in_progress(match):
             tc = match.group(1)
             return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">思考中...</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto; display: flex; flex-direction: column-reverse;"><div style="margin-bottom: auto;">{tc.strip().replace(chr(10), "<br>")}</div></div></details>'
         content = re.sub(r'<think>(.*?)$', format_think_in_progress, content, flags=re.DOTALL)
 
     if '<think>' not in content and '</think>' in content:
-        # 기능: format_think_no_start 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
         def format_think_no_start(match):
             think_content = match.group(1)
             if think_content.replace('\n', '').strip():
@@ -206,7 +195,6 @@ def process_assistant_content(content, is_streaming=False):
     return content
 
 
-# 모델과 토크나이저를 로드하고 캐시한다.
 @st.cache_resource
 def load_model_tokenizer(model_path):
     model = AutoModelForCausalLM.from_pretrained(
@@ -221,13 +209,11 @@ def load_model_tokenizer(model_path):
     return model, tokenizer
 
 
-# 채팅 메시지 상태를 초기화한다.
 def clear_chat_messages():
     del st.session_state.messages
     del st.session_state.chat_messages
 
 
-# 채팅 메시지를 초기화하고 기존 메시지를 화면에 렌더링한다.
 def init_chat_messages():
     if "messages" in st.session_state:
         for i, message in enumerate(st.session_state.messages):
@@ -244,14 +230,13 @@ def init_chat_messages():
 
     return st.session_state.messages
 
-# 마지막 응답을 삭제하고 재생성을 위해 리런한다.
 def regenerate_answer(index):
     st.session_state.messages.pop()
     st.session_state.chat_messages.pop()
     st.rerun()
 
 
-# 모델 디렉토리 동적 스캔
+# 动态扫描模型目录
 script_dir = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATHS = {}
 for d in sorted(os.listdir(script_dir), reverse=True):
@@ -262,14 +247,14 @@ for d in sorted(os.listdir(script_dir), reverse=True):
 if not MODEL_PATHS:
     MODEL_PATHS = {"No models found": ["", "No models"]}
 
-# 모델 선택
+# 模型选择
 selected_model = st.sidebar.selectbox('Model', list(MODEL_PATHS.keys()), index=0)
 model_path = MODEL_PATHS[selected_model][0]
 slogan = f"我是 {MODEL_PATHS[selected_model][1]}，有什么可以帮你的？" if st.session_state.get('lang', 'en') == 'zh' else f"I am {MODEL_PATHS[selected_model][1]}, how can I help you?"
 
 st.sidebar.markdown('<hr style="margin: 12px 0 16px 0;">', unsafe_allow_html=True)
 
-# 언어 선택
+# 语言选择
 lang_options = {'中文': 'zh', 'English': 'en'}
 current_lang = st.session_state.get('lang', 'en')
 lang_index = 0 if current_lang == 'zh' else 1
@@ -280,14 +265,14 @@ if lang_options[lang_label] != current_lang:
 
 st.sidebar.markdown('<hr style="margin: 12px 0 16px 0;">', unsafe_allow_html=True)
 
-# 파라미터 설정
+# 参数设置
 st.session_state.history_chat_num = st.sidebar.slider(get_text('history_rounds'), 0, 8, 0, step=2)
 st.session_state.max_new_tokens = st.sidebar.slider(get_text('max_length'), 256, 8192, 8192, step=1)
 st.session_state.temperature = st.sidebar.slider(get_text('temperature'), 0.6, 1.2, 0.90, step=0.01)
 
 st.sidebar.markdown('<hr style="margin: 12px 0 16px 0;">', unsafe_allow_html=True)
 
-# 기능 토글
+# 功能开关
 st.session_state.enable_thinking = st.sidebar.checkbox(get_text('thinking'), value=False, help=get_text('think_tip'))
 st.session_state.selected_tools = []
 with st.sidebar.expander(get_text('tools')):
@@ -314,7 +299,6 @@ st.markdown(
 )
 
 
-# 재현성을 위해 모든 난수 시드를 고정한다.
 def setup_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -325,7 +309,6 @@ def setup_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 
-# 메인 채팅 루프. 사용자 입력 처리, 모델 생성, 도구 호출을 관리한다.
 def main():
     model, tokenizer = load_model_tokenizer(model_path)
 
@@ -356,8 +339,8 @@ def main():
         st.markdown(
             f'<div style="display: flex; justify-content: flex-end;"><div style="display: inline-block; margin: 10px 0; padding: 8px 12px 8px 12px; background-color: #3d4450; border-radius: 22px; color: white;">{prompt}</div></div>',
             unsafe_allow_html=True)
-        messages.append({"role": "user", "content": prompt[-st.session_state.max_new_tokens:]})
-        st.session_state.chat_messages.append({"role": "user", "content": prompt[-st.session_state.max_new_tokens:]})
+        messages.append({"role": "user", "content": prompt})
+        st.session_state.chat_messages.append({"role": "user", "content": prompt})
 
         placeholder = st.empty()
 

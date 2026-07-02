@@ -27,33 +27,28 @@ from trainer.rollout_engine import create_rollout_engine
 warnings.filterwarnings('ignore')
 
 
-# 기능: 응답 안의 반복 n-gram 비율로 보상에서 뺄 penalty를 만듭니다.
 def rep_penalty(text, n=3, cap=0.5):
     toks = re.findall(r"\w+|[^\w\s]", text.lower())
     grams = [tuple(toks[i:i + n]) for i in range(len(toks) - n + 1)]
     return min(cap, (len(grams) - len(set(grams))) * cap * 2 / len(grams)) if grams else 0.0
 
 
-# MiniMindLM을 상속한 사용자 정의 Critic 모델
-# 역할: `CriticModel` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
+# 自定义的Critic模型，继承自MiniMindLM
 class CriticModel(MiniMindForCausalLM):
-    # 기능: CriticModel에 PPO value 예측용 scalar value head를 추가합니다.
     def __init__(self, params):
         super().__init__(params)
-        # lm_head를 단일 가치 값을 출력하는 선형 계층으로 교체
+        # 替换lm_head为输出单一价值的线性层
         self.value_head = nn.Linear(params.hidden_size, 1)
 
-    # 기능: CriticModel에서 MiniMind hidden state로 token별 value를 예측합니다.
     def forward(self, input_ids=None, attention_mask=None, **kwargs):
-        # 해당 단계의 처리 흐름을 설명
+        # 使用基础模型获取隐藏状态
         outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, **kwargs)
         hidden_states = self.model.norm(outputs[0])
-        # value_head로 가치 추정값 계산
+        # 使用value_head获取价值估计
         values = self.value_head(hidden_states).squeeze(-1)
         return values
 
 
-# 기능: 응답 길이, thinking 형식, 반복 penalty, reward model 점수를 합산합니다.
 def calculate_rewards(prompts, responses, reward_model):
     rewards = torch.zeros(len(responses), device=args.device)
 
@@ -81,7 +76,6 @@ def calculate_rewards(prompts, responses, reward_model):
     return rewards
 
 
-# 기능: rollout, 보상 계산, GAE, PPO actor/critic update를 한 epoch 수행합니다.
 def ppo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, actor_scheduler, critic_scheduler, reward_model, start_step=0, wandb=None, use_sglang=False):
     actor_model.train()
     critic_model.train()
@@ -133,7 +127,7 @@ def ppo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, actor_sched
         resp_policy_mask = ((resp_idx < resp_lengths.unsqueeze(1)) & resp_pad_mask).float()
         resp_value_mask = resp_policy_mask.clone()
 
-        with torch.no_grad():  # Rollout 단계는 추론으로 old_logp와 old_values만 얻고 그래디언트를 끊어 메모리를 절약
+        with torch.no_grad():  # Rollout阶段只需推理获取old_logp和old_values，切断梯度省显存
             critic_for_rollout = critic_model.module if isinstance(critic_model, DistributedDataParallel) else critic_model
             values_seq = critic_for_rollout(input_ids=gen_out, attention_mask=full_mask)
             old_resp_values = values_seq.gather(1, logp_pos) * resp_value_mask
@@ -141,7 +135,7 @@ def ppo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, actor_sched
             ref_resp_logp = F.log_softmax(ref_model(input_ids=gen_out, attention_mask=full_mask).logits[:, :-1], dim=-1).gather(2, labels.unsqueeze(-1)).squeeze(-1).gather(1, logp_pos)
             token_rewards = torch.zeros_like(old_resp_logp)
             last_idx = resp_lengths - 1  # [B]
-            token_rewards[torch.arange(B, device=args.device)[valid_resp], last_idx[valid_resp]] += rewards[valid_resp]  # 마지막 위치에 외부 보상을 추가
+            token_rewards[torch.arange(B, device=args.device)[valid_resp], last_idx[valid_resp]] += rewards[valid_resp]  # 末尾加外部奖励
 
             gen_len = old_resp_values.size(1); lastgaelam = torch.zeros(B, device=args.device); advs_rev = []
             for t in reversed(range(gen_len)):
@@ -186,7 +180,7 @@ def ppo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, actor_sched
                 log_ratio = mb_resp_logp - old_resp_logp[inds]
                 approx_kl = (0.5 * (log_ratio ** 2) * resp_policy_mask[inds]).sum() / resp_policy_mask[inds].sum().clamp(min=1)
                 
-                # 각 GPU의 approx_kl을 동기화해 일부 프로세스만 중단되어 DDP가 교착되는 상황을 방지
+                # 同步各卡的 approx_kl，防止某卡 break 而其它卡继续导致 DDP 死锁
                 approx_kl_val = approx_kl.detach().clone()
                 if dist.is_initialized():
                     dist.all_reduce(approx_kl_val, op=dist.ReduceOp.AVG)
@@ -211,7 +205,7 @@ def ppo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, actor_sched
                 kl = approx_kl_val
                 kl_ref = kl_ref_penalty.detach()
 
-                # 조기 종료 시에도 forward-backward 흐름은 유지해야 하므로 loss만 잘라 DDP 통신은 유지
+                # 早停时必须保证 forward-backward 闭环，故只截断 loss 不中断 DDP 通信
                 if stop_ppo:
                     loss = (policy_loss + args.vf_coef * value_loss + aux_loss) * 0.0
                 else:
@@ -286,9 +280,9 @@ def ppo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, actor_sched
             actor_state = raw_actor.state_dict()
             torch.save({k: v.half().cpu() for k, v in actor_state.items()}, ckp)
             
-            # lm_checkpoint로 critic을 포함한 전체 상태 저장
-            lm_checkpoint(lm_config, weight=args.save_weight, model=actor_model, optimizer=actor_optimizer,
-                         epoch=epoch, step=step, wandb=wandb, save_dir='../../minimind_out/checkpoints',
+            # 使用 lm_checkpoint 保存完整状态（包括 critic）
+            lm_checkpoint(lm_config, weight=args.save_weight, model=actor_model, optimizer=actor_optimizer, 
+                         epoch=epoch, step=step, wandb=wandb, save_dir='../checkpoints',
                          scheduler=actor_scheduler, critic_model=critic_model, 
                          critic_optimizer=critic_optimizer, critic_scheduler=critic_scheduler)
             actor_model.train()
@@ -301,7 +295,7 @@ def ppo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, actor_sched
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind PPO (Proximal Policy Optimization)")
-    parser.add_argument("--save_dir", type=str, default="../../minimind_out", help="模型保存目录")
+    parser.add_argument("--save_dir", type=str, default="../out", help="模型保存目录")
     parser.add_argument('--save_weight', default='ppo_actor', type=str, help="保存权重的前缀名")
     parser.add_argument("--epochs", type=int, default=1, help="训练轮数")
     parser.add_argument("--batch_size", type=int, default=2, help="batch size")
@@ -319,7 +313,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="是否使用MoE架构（0=否，1=是）")
     parser.add_argument('--max_seq_len', default=768, type=int, help="Prompt最大长度")
     parser.add_argument("--max_gen_len", type=int, default=1024, help="生成的最大长度")
-    parser.add_argument("--data_path", type=str, default="../../minimind_dataset/rlaif.jsonl", help="RLAIF数据路径")
+    parser.add_argument("--data_path", type=str, default="../dataset/rlaif.jsonl", help="RLAIF数据路径")
     parser.add_argument("--clip_epsilon", type=float, default=0.2, help="PPO裁剪参数")
     parser.add_argument("--vf_coef", type=float, default=0.5, help="Value function系数")
     parser.add_argument("--kl_coef", type=float, default=0.02, help="KL散度惩罚系数")
@@ -340,26 +334,26 @@ if __name__ == "__main__":
     parser.add_argument("--thinking_ratio", type=float, default=0.9, help="按概率开启thinking（0.0~1.0）")
     parser.add_argument("--rollout_engine", type=str, default="torch", choices=["torch", "sglang"], help="rollout引擎类型")
     parser.add_argument("--sglang_base_url", type=str, default="http://localhost:8998", help="SGLang服务器URL")
-    parser.add_argument("--sglang_model_path", type=str, default="../../minimind_model", help="SGLang tokenizer路径")
+    parser.add_argument("--sglang_model_path", type=str, default="../model", help="SGLang tokenizer路径")
     parser.add_argument("--sglang_shared_path", type=str, default="./sglang_ckpt_ppo", help="SGLang共享存储路径")
     args = parser.parse_args()
 
-# ========== 1. 환경과 난수 시드 초기화 ==========
+    # ========== 1. 初始化环境和随机种子 ==========
     local_rank = init_distributed_mode()
     if dist.is_initialized(): args.device = f"cuda:{local_rank}"
     setup_seed(42 + (dist.get_rank() if dist.is_initialized() else 0))
     
-# ========== 2. 디렉터리와 모델 파라미터 설정 및 체크포인트 확인 ==========
+    # ========== 2. 配置目录、模型参数、检查ckp ==========
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config = MiniMindConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers, use_moe=bool(args.use_moe))
-    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../../minimind_out/checkpoints') if args.from_resume==1 else None
+    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../checkpoints') if args.from_resume==1 else None
     
-# ========== 3. 혼합 정밀도 설정 ==========
+    # ========== 3. 设置混合精度 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"
     dtype = torch.bfloat16 if args.dtype == "bfloat16" else torch.float16
     autocast_ctx = nullcontext() if device_type == "cpu" else torch.cuda.amp.autocast(dtype=dtype)
     
-# ========== 4. wandb 설정 ==========
+    # ========== 4. 配wandb ==========
     wandb = None
     if args.use_wandb and is_main_process():
         import swanlab as wandb
@@ -368,9 +362,9 @@ if __name__ == "__main__":
         wandb_run_name = f"MiniMind-PPO-Epoch-{args.epochs}-BS-{args.batch_size}-LR-{args.learning_rate}"
         wandb.init(project=args.wandb_project, name=wandb_run_name, id=wandb_id, resume=resume)
     
-# ========== 5. 모델과 데이터 초기화 ==========
+    # ========== 5. 初始化模型和数据 ==========
     base_weight = args.from_weight
-    # 해당 단계의 처리 흐름을 설명
+    # Actor模型
     actor_model, tokenizer = init_model(lm_config, base_weight, device=args.device)
     ref_model, _ = init_model(lm_config, base_weight, device=args.device)
     ref_model = ref_model.eval().requires_grad_(False)
@@ -381,7 +375,7 @@ if __name__ == "__main__":
     critic_model.load_state_dict(state_dict, strict=False)
     critic_model = critic_model.to(args.device)
     reward_model = LMForRewardModel(args.reward_model_path, device=args.device, dtype=torch.float16)
-    # ===== Rollout 엔진 관련 처리 =====
+    # Rollout引擎
     rollout_engine = create_rollout_engine(
         engine_type=args.rollout_engine,
         policy_model=actor_model,
@@ -414,7 +408,7 @@ if __name__ == "__main__":
         start_epoch = ckp_data['epoch']
         start_step = ckp_data.get('step', 0)
     
-# ========== 7. 컴파일 및 분산 래핑 ==========
+    # ========== 7. 编译和分布式包装 ==========
     if args.use_compile == 1:
         actor_model = torch.compile(actor_model)
         Logger('torch.compile enabled')
@@ -424,7 +418,7 @@ if __name__ == "__main__":
         critic_model = DistributedDataParallel(critic_model, device_ids=[local_rank])
     rollout_engine.update_policy(actor_model)
     
-# ========== 8. 학습 시작 ==========
+    # ========== 8. 开始训练 ==========
     for epoch in range(start_epoch, args.epochs):
         train_sampler and train_sampler.set_epoch(epoch)
         setup_seed(42 + epoch); indices = torch.randperm(len(train_ds)).tolist()
@@ -437,7 +431,7 @@ if __name__ == "__main__":
         else:
             ppo_train_epoch(epoch, loader, len(loader), rollout_engine, ref_model, actor_scheduler, critic_scheduler, reward_model, 0, wandb, use_sglang = (args.rollout_engine == "sglang"))
     
-# ========== 9. 분산 프로세스 정리 ==========
+    # ========== 9. 清理分布进程 ==========
     if dist.is_initialized():
         dist.barrier()
         dist.destroy_process_group()
