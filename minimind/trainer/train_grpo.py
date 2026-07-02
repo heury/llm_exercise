@@ -1,10 +1,3 @@
-"""
-GRPO (Group Relative Policy Optimization) 학습 스크립트.
-
-여러 응답을 생성한 뒤 그룹 내 상대적 보상으로 정책을 최적화한다.
-Rollout 엔진(torch/sglang)을 플러그인 방식으로 교체할 수 있다.
-"""
-
 import os
 import sys
 
@@ -35,14 +28,12 @@ from trainer.rollout_engine import create_rollout_engine
 warnings.filterwarnings('ignore')
 
 
-# n-gram 반복 패널티를 계산한다. 반복이 많을수록 높은 값을 반환.
 def rep_penalty(text, n=3, cap=0.5):
     toks = re.findall(r"\w+|[^\w\s]", text.lower())
     grams = [tuple(toks[i:i + n]) for i in range(len(toks) - n + 1)]
     return min(cap, (len(grams) - len(set(grams))) * cap * 2 / len(grams)) if grams else 0.0
 
 
-# 프롬프트-응답 쌍에 대해 규칙 기반 보상 + 보상 모델 점수를 합산하여 반환.
 def calculate_rewards(prompts, responses, reward_model):
     rewards = torch.zeros(len(responses), device=args.device)
 
@@ -77,7 +68,6 @@ def calculate_rewards(prompts, responses, reward_model):
     return rewards
 
 
-# 한 에폭 동안 GRPO 학습을 수행한다. rollout -> 보상 계산 -> 정책 업데이트.
 def grpo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, reward_model, start_step=0, wandb=None, use_sglang=False):
     for step, batch in enumerate(loader, start=start_step + 1):
         prompts = batch['prompt']  # list[str], length B
@@ -195,8 +185,8 @@ def grpo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, reward_mod
             raw_model = getattr(raw_model, '_orig_mod', raw_model)
             state_dict = raw_model.state_dict()
             torch.save({k: v.half().cpu() for k, v in state_dict.items()}, ckp)
-            lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer,
-                         epoch=epoch, step=step, wandb=wandb, save_dir='../../minimind_out/checkpoints', scheduler=scheduler)
+            lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer, 
+                         epoch=epoch, step=step, wandb=wandb, save_dir='../checkpoints', scheduler=scheduler)
             model.train()
             del state_dict
 
@@ -215,61 +205,61 @@ def grpo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, reward_mod
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind GRPO (Group Relative Policy Optimization)")
-    parser.add_argument("--save_dir", type=str, default="../../minimind_out", help="모델 저장 디렉터리")
-    parser.add_argument('--save_weight', default='grpo', type=str, help="저장 가중치 접두사 이름")
-    parser.add_argument("--epochs", type=int, default=1, help="학습 에폭 수")
-    parser.add_argument("--batch_size", type=int, default=2, help="배치 크기")
-    parser.add_argument("--learning_rate", type=float, default=3e-7, help="초기 학습률")
-    parser.add_argument("--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu", help="학습 디바이스")
-    parser.add_argument("--dtype", type=str, default="bfloat16", help="혼합 정밀도 타입")
-    parser.add_argument("--num_workers", type=int, default=8, help="데이터 로딩 스레드 수")
-    parser.add_argument("--accumulation_steps", type=int, default=1, help="그래디언트 누적 스텝 수")
-    parser.add_argument("--grad_clip", type=float, default=1.0, help="그래디언트 클리핑 임계값")
-    parser.add_argument("--log_interval", type=int, default=1, help="로그 출력 간격")
-    parser.add_argument("--save_interval", type=int, default=10, help="모델 저장 간격")
-    parser.add_argument('--hidden_size', default=768, type=int, help="은닉층 차원")
-    parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 개수")
-    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부 (0=아니오, 1=예)")
-    parser.add_argument('--max_seq_len', default=768, type=int, help="프롬프트 최대 길이")
-    parser.add_argument("--max_gen_len", type=int, default=1024, help="생성 최대 길이")
-    parser.add_argument("--data_path", type=str, default="../../minimind_dataset/rlaif.jsonl", help="RLAIF 데이터 경로")
-    parser.add_argument("--num_generations", type=int, default=6, help="프롬프트당 생성 샘플 수")
-    parser.add_argument("--beta", type=float, default=0.1, help="KL 페널티 계수")
-    parser.add_argument("--loss_type", type=str, default="cispo", choices=["grpo", "cispo"], help="손실 함수 타입")
-    parser.add_argument("--epsilon", type=float, default=0.2, help="GRPO의 PPO clip epsilon")
-    parser.add_argument("--epsilon_high", type=float, default=5.0, help="epsilon 상한값")
-    parser.add_argument('--from_weight', default='full_sft', type=str, help="학습 기반 가중치")
-    parser.add_argument("--reward_model_path", type=str, default="../../internlm2-1_8b-reward", help="보상 모델 경로")
-    parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="자동 감지 및 이어서 학습 여부 (0=아니오, 1=예)")
-    parser.add_argument("--use_wandb", action="store_true", help="wandb 사용 여부")
-    parser.add_argument("--wandb_project", type=str, default="MiniMind-GRPO", help="wandb 프로젝트 이름")
-    parser.add_argument("--use_compile", default=0, type=int, choices=[0, 1], help="torch.compile 가속 사용 여부 (0=아니오, 1=예)")
-    parser.add_argument("--debug_mode", action="store_true", help="학습 디버그 샘플링 출력 여부")
-    parser.add_argument("--debug_interval", type=int, default=20, help="디버그 모드에서 샘플링 출력 스텝 간격")
-    parser.add_argument("--thinking_ratio", type=float, default=0.9, help="확률적으로 thinking 활성화 (0.0~1.0)")
-    parser.add_argument("--rollout_engine", type=str, default="torch", choices=["torch", "sglang"], help="rollout 엔진 타입")
-    parser.add_argument("--sglang_base_url", type=str, default="http://localhost:8998", help="SGLang 서버 URL")
-    parser.add_argument("--sglang_model_path", type=str, default="../../minimind_model", help="SGLang 토크나이저 경로")
-    parser.add_argument("--sglang_shared_path", type=str, default="./sglang_ckpt_grpo", help="SGLang 공유 저장 경로")
+    parser.add_argument("--save_dir", type=str, default="../out", help="模型保存目录")
+    parser.add_argument('--save_weight', default='grpo', type=str, help="保存权重的前缀名")
+    parser.add_argument("--epochs", type=int, default=1, help="训练轮数")
+    parser.add_argument("--batch_size", type=int, default=2, help="batch size")
+    parser.add_argument("--learning_rate", type=float, default=3e-7, help="初始学习率")
+    parser.add_argument("--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu", help="训练设备")
+    parser.add_argument("--dtype", type=str, default="bfloat16", help="混合精度类型")
+    parser.add_argument("--num_workers", type=int, default=8, help="数据加载线程数")
+    parser.add_argument("--accumulation_steps", type=int, default=1, help="梯度累积步数")
+    parser.add_argument("--grad_clip", type=float, default=1.0, help="梯度裁剪阈值")
+    parser.add_argument("--log_interval", type=int, default=1, help="日志打印间隔")
+    parser.add_argument("--save_interval", type=int, default=10, help="模型保存间隔")
+    parser.add_argument('--hidden_size', default=768, type=int, help="隐藏层维度")
+    parser.add_argument('--num_hidden_layers', default=8, type=int, help="隐藏层数量")
+    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="是否使用MoE架构（0=否，1=是）")
+    parser.add_argument('--max_seq_len', default=768, type=int, help="Prompt最大长度")
+    parser.add_argument("--max_gen_len", type=int, default=1024, help="生成的最大长度")
+    parser.add_argument("--data_path", type=str, default="../dataset/rlaif.jsonl", help="RLAIF数据路径")
+    parser.add_argument("--num_generations", type=int, default=6, help="每个prompt生成的样本数")
+    parser.add_argument("--beta", type=float, default=0.1, help="KL惩罚系数")
+    parser.add_argument("--loss_type", type=str, default="cispo", choices=["grpo", "cispo"], help="loss类型")
+    parser.add_argument("--epsilon", type=float, default=0.2, help="GRPO的PPO clip epsilon")
+    parser.add_argument("--epsilon_high", type=float, default=5.0, help="epsilon上界")
+    parser.add_argument('--from_weight', default='full_sft', type=str, help="基于哪个权重训练")
+    parser.add_argument("--reward_model_path", type=str, default="../../internlm2-1_8b-reward", help="Reward模型路径")
+    parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="是否自动检测&续训（0=否，1=是）")
+    parser.add_argument("--use_wandb", action="store_true", help="是否使用wandb")
+    parser.add_argument("--wandb_project", type=str, default="MiniMind-GRPO", help="wandb项目名")
+    parser.add_argument("--use_compile", default=0, type=int, choices=[0, 1], help="是否使用torch.compile加速（0=否，1=是）")
+    parser.add_argument("--debug_mode", action="store_true", help="是否打印训练调试采样")
+    parser.add_argument("--debug_interval", type=int, default=20, help="debug模式下每隔多少step打印一次采样")
+    parser.add_argument("--thinking_ratio", type=float, default=0.9, help="按概率开启thinking（0.0~1.0）")
+    parser.add_argument("--rollout_engine", type=str, default="torch", choices=["torch", "sglang"], help="rollout引擎类型")
+    parser.add_argument("--sglang_base_url", type=str, default="http://localhost:8998", help="SGLang服务器URL")
+    parser.add_argument("--sglang_model_path", type=str, default="../model", help="SGLang tokenizer路径")
+    parser.add_argument("--sglang_shared_path", type=str, default="./sglang_ckpt_grpo", help="SGLang共享存储路径")
     args = parser.parse_args()
 
-    # ========== 1. 환경 및 랜덤 시드 초기화 ==========
+    # ========== 1. 初始化环境和随机种子 ==========
     local_rank = init_distributed_mode()
     if dist.is_initialized(): args.device = f"cuda:{local_rank}"
     setup_seed(42 + (dist.get_rank() if dist.is_initialized() else 0))
-
-    # ========== 2. 디렉터리 설정, 모델 파라미터, 체크포인트 확인 ==========
+    
+    # ========== 2. 配置目录、模型参数、检查ckp ==========
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config = MiniMindConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers,
                                max_seq_len=args.max_seq_len + args.max_gen_len, use_moe=bool(args.use_moe))
-    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../../minimind_out/checkpoints') if args.from_resume==1 else None
-
-    # ========== 3. 혼합 정밀도 설정 ==========
+    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../checkpoints') if args.from_resume==1 else None
+    
+    # ========== 3. 设置混合精度 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"
     dtype = torch.bfloat16 if args.dtype == "bfloat16" else torch.float16
     autocast_ctx = nullcontext() if device_type == "cpu" else torch.cuda.amp.autocast(dtype=dtype)
-
-    # ========== 4. wandb 설정 ==========
+    
+    # ========== 4. 配wandb ==========
     wandb = None
     if args.use_wandb and is_main_process():
         import swanlab as wandb
@@ -277,17 +267,17 @@ if __name__ == "__main__":
         resume = 'must' if wandb_id else None
         wandb_run_name = f"MiniMind-GRPO-Epoch-{args.epochs}-BS-{args.batch_size}-LR-{args.learning_rate}"
         wandb.init(project=args.wandb_project, name=wandb_run_name, id=wandb_id, resume=resume)
-
-    # ========== 5. 모델 및 데이터 초기화 ==========
+    
+    # ========== 5. 初始化模型和数据 ==========
     base_weight = args.from_weight
-    # Policy 모델
+    # Policy模型
     model, tokenizer = init_model(lm_config, base_weight, device=args.device)
-    # Reference 모델
+    # Reference模型
     ref_model, _ = init_model(lm_config, base_weight, device=args.device)
     ref_model = ref_model.eval().requires_grad_(False)
-    # 보상 모델
+    # Reward模型
     reward_model = LMForRewardModel(args.reward_model_path, device=args.device, dtype=torch.float16)
-    # Rollout 엔진 (플러그인 방식으로 교체 가능, policy 추론만 담당)
+    # Rollout引擎（可插拔替换，只负责 policy 推理）
     rollout_engine = create_rollout_engine(
         engine_type=args.rollout_engine,
         policy_model=model,
@@ -298,7 +288,7 @@ if __name__ == "__main__":
         sglang_model_path=args.sglang_model_path,
         sglang_shared_path=args.sglang_shared_path,
     )
-    # 데이터 및 옵티마이저
+    # 数据和优化器
     train_ds = RLAIFDataset(args.data_path, tokenizer, max_length=lm_config.max_seq_len, thinking_ratio=args.thinking_ratio)
     train_sampler = DistributedSampler(train_ds) if dist.is_initialized() else None
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
@@ -306,8 +296,8 @@ if __name__ == "__main__":
     iters = len(loader_for_count)
     total_optimizer_steps = math.ceil(iters / args.accumulation_steps) * args.epochs
     scheduler = CosineAnnealingLR(optimizer, T_max=total_optimizer_steps, eta_min=args.learning_rate / 10)
-
-    # ========== 6. 체크포인트에서 상태 복원 ==========
+    
+    # ========== 6. 从ckp恢复状态 ==========
     start_epoch, start_step = 0, 0
     if ckp_data:
         model.load_state_dict(ckp_data['model'])
@@ -315,8 +305,8 @@ if __name__ == "__main__":
         scheduler.load_state_dict(ckp_data['scheduler'])
         start_epoch = ckp_data['epoch']
         start_step = ckp_data.get('step', 0)
-
-    # ========== 7. 컴파일 및 분산 래핑 ==========
+    
+    # ========== 7. 编译和分布式包装 ==========
     if args.use_compile == 1:
         model = torch.compile(model)
         Logger('torch.compile enabled')
@@ -324,21 +314,21 @@ if __name__ == "__main__":
     if dist.is_initialized():
         model = DistributedDataParallel(model, device_ids=[local_rank])
     rollout_engine.update_policy(model)
-
-    # ========== 8. 학습 시작 ==========
+    
+    # ========== 8. 开始训练 ==========
     for epoch in range(start_epoch, args.epochs):
         train_sampler and train_sampler.set_epoch(epoch)
         setup_seed(42 + epoch); indices = torch.randperm(len(train_ds)).tolist()
         skip = start_step if (epoch == start_epoch and start_step > 0) else 0
         batch_sampler = SkipBatchSampler(train_sampler or indices, args.batch_size, skip)
         loader = DataLoader(train_ds, batch_sampler=batch_sampler, num_workers=args.num_workers, pin_memory=True)
-        if skip > 0:
-            Logger(f'Epoch [{epoch + 1}/{args.epochs}]: 앞의 {start_step}개 step을 건너뛰고 step {start_step + 1}부터 시작')
+        if skip > 0: 
+            Logger(f'Epoch [{epoch + 1}/{args.epochs}]: 跳过前{start_step}个step，从step {start_step + 1}开始')
             grpo_train_epoch(epoch, loader, len(loader) + skip, rollout_engine, ref_model, reward_model, start_step, wandb, use_sglang = (args.rollout_engine == "sglang"))
         else:
             grpo_train_epoch(epoch, loader, len(loader), rollout_engine, ref_model, reward_model, 0, wandb, use_sglang = (args.rollout_engine == "sglang"))
-
-    # ========== 9. 분산 프로세스 정리 ==========
+    
+    # ========== 9. 清理分布进程 ==========
     if dist.is_initialized():
         dist.barrier()
         dist.destroy_process_group()

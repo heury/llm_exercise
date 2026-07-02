@@ -1,4 +1,3 @@
-# 언어 모델 학습용 데이터셋 모듈 (사전학습, SFT, DPO, RLAIF, Agent RL 데이터셋 포함)
 from torch.utils.data import Dataset
 import torch
 import json
@@ -7,9 +6,8 @@ import random
 from datasets import load_dataset, Features, Sequence, Value
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# 대화 전처리: system 프롬프트를 확률적으로 추가하고, tool use 데이터는 그대로 유지
 def pre_processing_chat(conversations, add_system_ratio=0.2):
-    # tool use 데이터는 원본 그대로 유지하고 처리하지 않음
+    # tool use 数据完整保留不做处理
     if any(conv.get('tools') for conv in conversations): return conversations
 
     SYSTEM_PROMPTS = [
@@ -24,33 +22,28 @@ def pre_processing_chat(conversations, add_system_ratio=0.2):
         "You are a knowledgeable AI. Try your best to provide accurate information.",
         "You are minimind, a small but useful language model."
     ]
-    # 확률적으로 system 프롬프트 추가
+    # 概率性添加system
     if conversations[0].get('role') != 'system':
         if random.random() < add_system_ratio:
             return [{'role': 'system', 'content': random.choice(SYSTEM_PROMPTS)}] + conversations
     return conversations
 
-# 대화 후처리: 빈 사고 태그를 확률적으로 제거
 def post_processing_chat(prompt_content, empty_think_ratio=0.2):
-    # 80% 확률로 빈 사고(think) 태그 제거
+    # 以80%概率移除空思考标签
     if '<think>\n\n</think>\n\n' in prompt_content and random.random() > empty_think_ratio:
         prompt_content = prompt_content.replace('<think>\n\n</think>\n\n', '')
     return prompt_content
 
-# 사전학습 데이터셋: 원시 텍스트를 토큰화하여 언어 모델 학습에 사용
 class PretrainDataset(Dataset):
-    # 기능: PretrainDataset 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, data_path, tokenizer, max_length=512):
         super().__init__()
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.samples = load_dataset('json', data_files=data_path, split='train')
 
-    # 기능: __len__ 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def __len__(self):
         return len(self.samples)
 
-    # 기능: __getitem__ 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def __getitem__(self, index):
         sample = self.samples[index]
         tokens = self.tokenizer(str(sample['text']), add_special_tokens=False, max_length=self.max_length - 2, truncation=True).input_ids
@@ -62,9 +55,7 @@ class PretrainDataset(Dataset):
         return input_ids, labels
 
 
-# SFT(지도 미세조정) 데이터셋: 대화 형식의 데이터로 모델을 미세조정
 class SFTDataset(Dataset):
-    # 기능: SFTDataset 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, jsonl_path, tokenizer, max_length=1024):
         super().__init__()
         self.tokenizer = tokenizer
@@ -74,11 +65,9 @@ class SFTDataset(Dataset):
         self.bos_id = tokenizer(f'{tokenizer.bos_token}assistant\n', add_special_tokens=False).input_ids
         self.eos_id = tokenizer(f'{tokenizer.eos_token}\n', add_special_tokens=False).input_ids
 
-    # 기능: __len__ 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def __len__(self):
         return len(self.samples)
 
-    # 대화 메시지를 chat template으로 변환하여 프롬프트 문자열 생성
     def create_chat_prompt(self, conversations):
         messages = []
         tools = None
@@ -96,7 +85,6 @@ class SFTDataset(Dataset):
             tools=tools
         )
 
-    # assistant 응답 부분만 학습하도록 라벨 생성 (나머지는 -100으로 마스킹)
     def generate_labels(self, input_ids):
         labels = [-100] * len(input_ids)
         i = 0
@@ -115,7 +103,6 @@ class SFTDataset(Dataset):
                 i += 1
         return labels
 
-    # 기능: __getitem__ 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def __getitem__(self, index):
         sample = self.samples[index]
         conversations = pre_processing_chat(sample['conversations'])
@@ -124,17 +111,15 @@ class SFTDataset(Dataset):
         input_ids = self.tokenizer(prompt).input_ids[:self.max_length]
         input_ids += [self.tokenizer.pad_token_id] * (self.max_length - len(input_ids))
         labels = self.generate_labels(input_ids)
-        # # === 디버그 출력 ===
+        # # === 调试打印 ===
         # print(f"\n--- Sample {index} ---")
         # for i, (x, y) in enumerate(zip(input_ids[:-1], labels[1:])):
         #     print(f"{i:3d}: X={self.tokenizer.decode([x])!r:16s} ---> Y={self.tokenizer.decode([input_ids[i+1]])!r:16s} label={y}")
-        # # ==================
+        # # ================
         return torch.tensor(input_ids, dtype=torch.long), torch.tensor(labels, dtype=torch.long)
 
 
-# DPO(직접 선호도 최적화) 데이터셋: chosen/rejected 쌍으로 선호도 학습
 class DPODataset(Dataset):
-    # 기능: DPODataset 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, file_path, tokenizer, max_length=4096):
         super().__init__()
         self.tokenizer = tokenizer
@@ -144,15 +129,13 @@ class DPODataset(Dataset):
         self.eos_id = tokenizer(f'{tokenizer.eos_token}\n', add_special_tokens=False).input_ids
         self.samples = load_dataset('json', data_files=file_path, split='train')
 
-    # 기능: __len__ 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def __len__(self):
         return len(self.samples)
 
-    # 기능: __getitem__ 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def __getitem__(self, index):
         sample = self.samples[index]
-        chosen = sample['chosen']  # {role, content}로 구성된 대화 리스트
-        rejected = sample['rejected']  # 위와 동일한 형식
+        chosen = sample['chosen']  # 是一个 list，里面包含若干 {role, content}
+        rejected = sample['rejected']  # 同上
         chosen_prompt = self.tokenizer.apply_chat_template(
             chosen, tokenize=False, add_generation_prompt=False
         )
@@ -190,7 +173,6 @@ class DPODataset(Dataset):
             'mask_rejected': mask_rejected
         }
 
-    # assistant 응답 부분에만 손실을 계산하도록 마스크 생성
     def generate_loss_mask(self, input_ids):
         loss_mask = [0] * len(input_ids)
         i = 0
@@ -210,23 +192,19 @@ class DPODataset(Dataset):
         return loss_mask
 
 
-# RLAIF(AI 피드백 강화학습) 데이터셋: thinking 모드를 확률적으로 활성화
 class RLAIFDataset(Dataset):
-    # 기능: RLAIFDataset 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, jsonl_path, tokenizer, max_length=1024, thinking_ratio=0.5):
         super().__init__()
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.thinking_ratio = thinking_ratio  # 확률적으로 thinking 모드 활성화
+        self.thinking_ratio = thinking_ratio  # 按概率开启 thinking
         self.samples = load_dataset('json', data_files=jsonl_path, split='train')
         self.bos_id = tokenizer(f'{tokenizer.bos_token}assistant', add_special_tokens=False).input_ids
         self.eos_id = tokenizer(f'{tokenizer.eos_token}', add_special_tokens=False).input_ids
 
-    # 기능: __len__ 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def __len__(self):
         return len(self.samples)
 
-    # 대화를 전처리하고 thinking 모드를 확률적으로 적용하여 프롬프트 생성
     def create_chat_prompt(self, conversations):
         conversations = pre_processing_chat(conversations)
         use_thinking = random.random() < self.thinking_ratio
@@ -236,7 +214,6 @@ class RLAIFDataset(Dataset):
             open_thinking=use_thinking,
             add_generation_prompt=True
         )
-    # 기능: __getitem__ 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def __getitem__(self, index):
         sample = self.samples[index]
         prompt = self.create_chat_prompt(sample['conversations'])
@@ -246,9 +223,7 @@ class RLAIFDataset(Dataset):
             'answer': ""
         }
 
-# 에이전트 강화학습 데이터셋: tool use 대화 데이터를 파싱하여 학습에 사용
 class AgentRLDataset(Dataset):
-    # 기능: AgentRLDataset 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, jsonl_path, tokenizer, max_length=1024):
         super().__init__()
         self.tokenizer = tokenizer
@@ -258,11 +233,9 @@ class AgentRLDataset(Dataset):
             for line in f:
                 self.samples.append(json.loads(line.strip()))
 
-    # 기능: __len__ 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def __len__(self):
         return len(self.samples)
 
-    # 대화에서 메시지와 도구 정보를 분리하여 반환
     def parse_conversations(self, conversations):
         messages = []
         tools = None
@@ -273,7 +246,6 @@ class AgentRLDataset(Dataset):
             messages.append(message)
         return messages[:-1], tools
 
-    # 기능: __getitem__ 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def __getitem__(self, index):
         sample = self.samples[index]
         messages, tools = self.parse_conversations(sample['conversations'])

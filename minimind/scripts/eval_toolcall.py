@@ -1,4 +1,3 @@
-# MiniMind 도구 호출(Tool Call) 평가 스크립트 - 자동/수동 테스트 모드 지원
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -40,7 +39,6 @@ MOCK_RESULTS = {
 
 TOOL_MAP = {t["function"]["name"]: t for t in TOOLS}
 
-# 기능: get_tools에서 현재 상태의 필요 값을 조회해 반환합니다.
 def get_tools(names):
     return [TOOL_MAP[n] for n in names]
 
@@ -56,8 +54,6 @@ TEST_CASES = [
 ]
 
 
-# 모델 초기화 및 로드
-# 기능: init_model 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def init_model(args):
     tokenizer = AutoTokenizer.from_pretrained(args.load_from)
     if 'model' in args.load_from:
@@ -71,8 +67,6 @@ def init_model(args):
     return model.half().eval().to(args.device), tokenizer
 
 
-# 응답 텍스트에서 도구 호출 파싱
-# 기능: parse_tool_calls에서 문자열을 분석해 구조화된 값으로 parsing합니다.
 def parse_tool_calls(text):
     matches = re.findall(r'<tool_call>(.*?)</tool_call>', text, re.DOTALL)
     calls = []
@@ -84,8 +78,6 @@ def parse_tool_calls(text):
     return calls
 
 
-# 텍스트에서 도구 호출 정보 추출 (API 모드용)
-# 기능: parse_tool_call_from_text에서 문자열을 분석해 구조화된 값으로 parsing합니다.
 def parse_tool_call_from_text(content):
     pattern = r'<tool_call>\s*(\{.*?\})\s*</tool_call>'
     matches = re.findall(pattern, content, re.DOTALL)
@@ -104,8 +96,6 @@ def parse_tool_call_from_text(content):
     return tool_calls if tool_calls else None
 
 
-# 도구 실행 및 결과 반환
-# 기능: execute_tool 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def execute_tool(call, arguments=None):
     name = call.get("name", "") if isinstance(call, dict) else call
     try:
@@ -115,15 +105,13 @@ def execute_tool(call, arguments=None):
         args = {}
     fn = MOCK_RESULTS.get(name)
     if not fn:
-        return {"error": f"알 수 없는 도구: {name}"}
+        return {"error": f"未知工具: {name}"}
     try:
         return fn(args)
     except Exception as e:
-        return {"error": f"도구 실행 실패: {str(e)[:80]}"}
+        return {"error": f"工具执行失败: {str(e)[:80]}"}
 
 
-# 로컬 모델로 텍스트 생성
-# 기능: generate 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def generate(model, tokenizer, messages, tools, args):
     streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
     input_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, tools=tools, open_thinking=False)
@@ -142,8 +130,6 @@ def generate(model, tokenizer, messages, tools, args):
     return response
 
 
-# OpenAI 호환 API를 통한 채팅 요청
-# 기능: chat_api 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def chat_api(client, messages, tools, args, stream=True):
     response = client.chat.completions.create(
         model=args.api_model, messages=messages, tools=tools,
@@ -188,8 +174,6 @@ def chat_api(client, messages, tools, args, stream=True):
     return content, tool_calls
 
 
-# 단일 테스트 케이스 실행 (도구 호출 루프 포함)
-# 기능: run_case에서 model 실행 또는 평가 routine을 수행합니다.
 def run_case(prompt, tools, args, model=None, tokenizer=None, client=None):
     messages = [{"role": "user", "content": prompt}]
     while True:
@@ -215,40 +199,38 @@ def run_case(prompt, tools, args, model=None, tokenizer=None, client=None):
             messages.append({"role": "tool", "content": json.dumps(result, ensure_ascii=False)} if args.backend == 'local' else {"role": "tool", "content": json.dumps(result, ensure_ascii=False), "tool_call_id": tc["id"]})
 
 
-# 메인 함수: 인자 파싱 및 테스트 실행
-# 기능: main 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def main():
-    parser = argparse.ArgumentParser(description="MiniMind ToolCall 평가")
-    parser.add_argument('--backend', default='local', choices=['local', 'api'], type=str, help="추론 백엔드 (local=로컬 모델, api=OpenAI 호환 인터페이스)")
-    parser.add_argument('--load_from', default='../../minimind_model', type=str, help="모델 로드 경로 (model=원본 torch 가중치, 기타=transformers 형식)")
-    parser.add_argument('--save_dir', default='../../minimind_out', type=str, help="모델 가중치 디렉토리")
-    parser.add_argument('--weight', default='full_sft', type=str, help="가중치 이름 접두사 (pretrain, full_sft, rlhf, reason, ppo_actor, grpo, spo)")
-    parser.add_argument('--hidden_size', default=768, type=int, help="은닉층 차원")
-    parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 수")
-    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부 (0=아니오, 1=예)")
-    parser.add_argument('--max_new_tokens', default=512, type=int, help="최대 생성 길이")
-    parser.add_argument('--temperature', default=0.9, type=float, help="생성 온도, 무작위성 제어 (0-1, 높을수록 무작위)")
-    parser.add_argument('--top_p', default=0.9, type=float, help="nucleus 샘플링 임계값 (0-1)")
-    parser.add_argument('--show_speed', default=0, type=int, help="디코딩 속도 표시 (tokens/s)")
-    parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', type=str, help="실행 디바이스")
-    parser.add_argument('--api_base_url', default="http://localhost:11434/v1", type=str, help="OpenAI 호환 인터페이스 base_url")
-    parser.add_argument('--api_key', default='sk-123', type=str, help="OpenAI 호환 인터페이스 api_key")
-    parser.add_argument('--api_model', default='jingyaogong/minimind-3:latest', type=str, help="API 요청에 사용할 모델 이름")
-    parser.add_argument('--stream', default=1, type=int, help="API 모드에서 스트리밍 출력 여부 (0=아니오, 1=예)")
+    parser = argparse.ArgumentParser(description="MiniMind ToolCall评测")
+    parser.add_argument('--backend', default='local', choices=['local', 'api'], type=str, help="推理后端（local=本地模型，api=OpenAI兼容接口）")
+    parser.add_argument('--load_from', default='../model', type=str, help="模型加载路径（model=原生torch权重，其他路径=transformers格式）")
+    parser.add_argument('--save_dir', default='../out', type=str, help="模型权重目录")
+    parser.add_argument('--weight', default='full_sft', type=str, help="权重名称前缀（pretrain, full_sft, rlhf, reason, ppo_actor, grpo, spo）")
+    parser.add_argument('--hidden_size', default=768, type=int, help="隐藏层维度")
+    parser.add_argument('--num_hidden_layers', default=8, type=int, help="隐藏层数量")
+    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="是否使用MoE架构（0=否，1=是）")
+    parser.add_argument('--max_new_tokens', default=512, type=int, help="最大生成长度")
+    parser.add_argument('--temperature', default=0.9, type=float, help="生成温度，控制随机性（0-1，越大越随机）")
+    parser.add_argument('--top_p', default=0.9, type=float, help="nucleus采样阈值（0-1）")
+    parser.add_argument('--show_speed', default=0, type=int, help="显示decode速度（tokens/s）")
+    parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', type=str, help="运行设备")
+    parser.add_argument('--api_base_url', default="http://localhost:11434/v1", type=str, help="OpenAI兼容接口的base_url")
+    parser.add_argument('--api_key', default='sk-123', type=str, help="OpenAI兼容接口的api_key")
+    parser.add_argument('--api_model', default='jingyaogong/minimind-3:latest', type=str, help="API请求时使用的模型名称")
+    parser.add_argument('--stream', default=1, type=int, help="API模式下是否流式输出（0=否，1=是）")
     args = parser.parse_args()
 
     model = tokenizer = client = None
     if args.backend == 'local': model, tokenizer = init_model(args)
     else: client = OpenAI(api_key=args.api_key, base_url=args.api_base_url)
 
-    input_mode = int(input('[0] 자동 테스트\n[1] 수동 입력\n'))
+    input_mode = int(input('[0] 自动测试\n[1] 手动输入\n'))
 
     cases = [{"prompt": case["prompt"], "tools": get_tools(case["tools"]), "tool_names": case["tools"]} for case in TEST_CASES] if input_mode == 0 else iter(lambda: {"prompt": input('💬: '), "tools": TOOLS, "tool_names": [t["function"]["name"] for t in TOOLS]}, {"prompt": "", "tools": TOOLS, "tool_names": []})
     for case in cases:
         if not case["prompt"]: break
         setup_seed(random.randint(0, 31415926))
         if input_mode == 0:
-            print(f'📦 사용 가능한 도구: {case["tool_names"]}\n')
+            print(f'📦 可用工具: {case["tool_names"]}\n')
             print(f'💬: {case["prompt"]}')
         run_case(case["prompt"], case["tools"], args, model=model, tokenizer=tokenizer, client=client)
         print('\n' + '-' * 50 + '\n')

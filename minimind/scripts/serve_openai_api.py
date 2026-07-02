@@ -15,7 +15,7 @@ from threading import Thread
 from queue import Queue
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from transformers import AutoTokenizer, AutoModelForCausalLM, TextStreamer
 from model.model_minimind import MiniMindConfig, MiniMindForCausalLM
 from model.model_lora import apply_lora, load_lora
@@ -25,7 +25,6 @@ warnings.filterwarnings('ignore')
 app = FastAPI()
 
 
-# 기능: init_model 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def init_model(args):
     tokenizer = AutoTokenizer.from_pretrained(args.load_from)
     if 'model' in args.load_from:
@@ -48,7 +47,6 @@ def init_model(args):
     return model.half().eval().to(device), tokenizer
 
 
-# 역할: `ChatRequest` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
 class ChatRequest(BaseModel):
     model: str
     messages: list
@@ -56,12 +54,12 @@ class ChatRequest(BaseModel):
     top_p: float = 0.92
     max_tokens: int = 8192
     stream: bool = True
-    tools: list = []
+    tools: list = Field(default_factory=list)
     open_thinking: bool = False
     chat_template_kwargs: dict = None
     
-    # 기능: get_open_thinking에서 현재 상태의 필요 값을 조회해 반환합니다.
     def get_open_thinking(self) -> bool:
+        """兼容多种方式开启 thinking"""
         if self.open_thinking:
             return True
         if self.chat_template_kwargs:
@@ -70,22 +68,18 @@ class ChatRequest(BaseModel):
         return False
 
 
-# 역할: `CustomStreamer` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
 class CustomStreamer(TextStreamer):
-    # 기능: CustomStreamer 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, tokenizer, queue):
         super().__init__(tokenizer, skip_prompt=True, skip_special_tokens=True)
         self.queue = queue
         self.tokenizer = tokenizer
 
-    # 기능: on_finalized_text 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def on_finalized_text(self, text: str, stream_end: bool = False):
         self.queue.put(text)
         if stream_end:
             self.queue.put(None)
 
 
-# 기능: parse_response에서 문자열을 분석해 구조화된 값으로 parsing합니다.
 def parse_response(text):
     reasoning_content = None
     think_match = re.search(r'<think>(.*?)</think>', text, re.DOTALL)
@@ -108,28 +102,30 @@ def parse_response(text):
     return text.strip(), reasoning_content, tool_calls or None
 
 
-# 기능: generate_stream_response 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def generate_stream_response(messages, temperature, top_p, max_tokens, tools=None, open_thinking=False):
     try:
-        new_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, tools=tools or None, open_thinking=open_thinking)[-max_tokens:]
+        new_prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, tools=tools or None, open_thinking=open_thinking)
         inputs = tokenizer(new_prompt, return_tensors="pt", truncation=True).to(device)
 
         queue = Queue()
         streamer = CustomStreamer(tokenizer, queue)
 
-        # 기능: _generate 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
         def _generate():
-            model.generate(
-                inputs.input_ids,
-                max_new_tokens=max_tokens,
-                do_sample=True,
-                temperature=temperature,
-                top_p=top_p,
-                attention_mask=inputs.attention_mask,
-                pad_token_id=tokenizer.pad_token_id,
-                eos_token_id=tokenizer.eos_token_id,
-                streamer=streamer
-            )
+            try:
+                model.generate(
+                    inputs.input_ids,
+                    max_new_tokens=max_tokens,
+                    do_sample=True,
+                    temperature=temperature,
+                    top_p=top_p,
+                    attention_mask=inputs.attention_mask,
+                    pad_token_id=tokenizer.pad_token_id,
+                    eos_token_id=tokenizer.eos_token_id,
+                    streamer=streamer
+                )
+            except Exception as e:
+                queue.put({"error": str(e)})
+                queue.put(None)
 
         Thread(target=_generate).start()
 
@@ -141,6 +137,9 @@ def generate_stream_response(messages, temperature, top_p, max_tokens, tools=Non
             text = queue.get()
             if text is None:
                 break
+            if isinstance(text, dict):
+                yield json.dumps(text, ensure_ascii=False)
+                continue
             full_text += text
 
             if not thinking_ended:
@@ -176,7 +175,6 @@ def generate_stream_response(messages, temperature, top_p, max_tokens, tools=Non
         yield json.dumps({"error": str(e)})
 
 
-# 기능: chat_completions 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest):
     try:
@@ -199,7 +197,7 @@ async def chat_completions(request: ChatRequest):
                 add_generation_prompt=True,
                 tools=request.tools or None,
                 open_thinking=request.get_open_thinking()
-            )[-request.max_tokens:]
+            )
             inputs = tokenizer(new_prompt, return_tensors="pt", truncation=True).to(device)
             with torch.no_grad():
                 generated_ids = model.generate(

@@ -7,10 +7,8 @@ from transformers.modeling_outputs import MoeCausalLMOutputWithPast
 # 🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏
 #                                     MiniMind Config
 # 🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏
-# 역할: `MiniMindConfig` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
 class MiniMindConfig(PretrainedConfig):
     model_type = "minimind"
-    # 기능: MiniMindConfig에 모델 차원, 레이어, attention, RoPE, MoE 설정을 저장합니다.
     def __init__(self, hidden_size=768, num_hidden_layers=8, use_moe=False, **kwargs):
         super().__init__(**kwargs)
         self.hidden_size = hidden_size
@@ -49,23 +47,18 @@ class MiniMindConfig(PretrainedConfig):
 # 🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏
 #                                     MiniMind Model
 # 🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏🌎🌍🌏
-# 역할: `RMSNorm` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
 class RMSNorm(torch.nn.Module):
-    # 기능: RMSNorm scale parameter와 epsilon을 초기화합니다.
     def __init__(self, dim: int, eps: float = 1e-5):
         super().__init__()
         self.eps = eps
         self.weight = nn.Parameter(torch.ones(dim))
 
-    # 기능: RMSNorm의 평균제곱근 역수로 tensor를 정규화합니다.
     def norm(self, x):
         return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
 
-    # 기능: RMSNorm 정규화 결과에 학습 가능한 scale을 곱합니다.
     def forward(self, x):
         return (self.weight * self.norm(x.float())).type_as(x)
 
-# 기능: precompute_freqs_cis 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def precompute_freqs_cis(dim: int, end: int = int(32 * 1024), rope_base: float = 1e6, rope_scaling: dict = None):
     freqs, attn_factor = 1.0 / (rope_base ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim)), 1.0
     if rope_scaling is not None: # YaRN: f'(i) = f(i)((1-γ) + γ/s), where γ∈[0,1] is linear ramp
@@ -84,25 +77,18 @@ def precompute_freqs_cis(dim: int, end: int = int(32 * 1024), rope_base: float =
     freqs_sin = torch.cat([torch.sin(freqs), torch.sin(freqs)], dim=-1) * attn_factor
     return freqs_cos, freqs_sin
 
-# 기능: apply_rotary_pos_emb 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
-    # RoPE 회전을 위해 마지막 차원을 절반으로 나눈 뒤 앞/뒤 절반을 부호 반전과 함께 교차시킵니다.
-    # 기능: RoPE 회전을 위해 hidden 차원의 앞뒤 절반을 교차하고 부호를 반전합니다.
-    def rotate_half(x):
-        return torch.cat((-x[..., x.shape[-1] // 2:], x[..., : x.shape[-1] // 2]), dim=-1)
+    def rotate_half(x): return torch.cat((-x[..., x.shape[-1] // 2:], x[..., : x.shape[-1] // 2]), dim=-1)
     q_embed = ((q * cos.unsqueeze(unsqueeze_dim)) + (rotate_half(q) * sin.unsqueeze(unsqueeze_dim))).to(q.dtype)
     k_embed = ((k * cos.unsqueeze(unsqueeze_dim)) + (rotate_half(k) * sin.unsqueeze(unsqueeze_dim))).to(k.dtype)
     return q_embed, k_embed
 
-# 기능: repeat_kv 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
     bs, slen, num_key_value_heads, head_dim = x.shape
     if n_rep == 1: return x
     return (x[:, :, :, None, :].expand(bs, slen, num_key_value_heads, n_rep, head_dim).reshape(bs, slen, num_key_value_heads * n_rep, head_dim))
 
-# 역할: `Attention` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
 class Attention(nn.Module):
-    # 기능: Attention Q/K/V/O projection, head 구성, dropout, cache 설정을 초기화합니다.
     def __init__(self, config: MiniMindConfig):
         super().__init__()
         self.num_key_value_heads = config.num_attention_heads if config.num_key_value_heads is None else config.num_key_value_heads
@@ -122,7 +108,6 @@ class Attention(nn.Module):
         self.dropout = config.dropout
         self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention') and config.flash_attn
 
-    # 기능: Attention에서 RoPE가 적용된 causal self-attention을 계산합니다.
     def forward(self, x, position_embeddings, past_key_value=None, use_cache=False, attention_mask=None):
         bsz, seq_len, _ = x.shape
         xq, xk, xv = self.q_proj(x), self.k_proj(x), self.v_proj(x)
@@ -148,9 +133,7 @@ class Attention(nn.Module):
         output = self.resid_dropout(self.o_proj(output))
         return output, past_kv
 
-# 역할: `FeedForward` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
 class FeedForward(nn.Module):
-    # 기능: FeedForward gate/up/down projection으로 구성된 FFN을 초기화합니다.
     def __init__(self, config: MiniMindConfig, intermediate_size: int = None):
         super().__init__()
         intermediate_size = intermediate_size or config.intermediate_size
@@ -159,13 +142,10 @@ class FeedForward(nn.Module):
         self.up_proj = nn.Linear(config.hidden_size, intermediate_size, bias=False)
         self.act_fn = ACT2FN[config.hidden_act]
 
-    # 기능: FeedForward에서 SiLU gate와 up projection을 곱해 FFN 출력을 만듭니다.
     def forward(self, x):
         return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
 
-# 역할: `MOEFeedForward` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
 class MOEFeedForward(nn.Module):
-    # 기능: MOEFeedForward 전문가 FFN 목록과 token routing gate를 초기화합니다.
     def __init__(self, config: MiniMindConfig):
         super().__init__()
         self.config = config
@@ -173,7 +153,6 @@ class MOEFeedForward(nn.Module):
         self.experts = nn.ModuleList([FeedForward(config, intermediate_size=config.moe_intermediate_size) for _ in range(config.num_experts)])
         self.act_fn = ACT2FN[config.hidden_act]
 
-    # 기능: MOEFeedForward에서 token별 top-k 전문가 출력을 가중합합니다.
     def forward(self, x):
         batch_size, seq_len, hidden_dim = x.shape
         x_flat = x.view(-1, hidden_dim)
@@ -196,9 +175,7 @@ class MOEFeedForward(nn.Module):
             self.aux_loss = scores.new_zeros(1).squeeze()
         return y.view(batch_size, seq_len, hidden_dim)
 
-# 역할: `MiniMindBlock` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
 class MiniMindBlock(nn.Module):
-    # 기능: MiniMindBlock attention, FFN/MoE, norm 계층을 한 블록으로 초기화합니다.
     def __init__(self, layer_id: int, config: MiniMindConfig):
         super().__init__()
         self.self_attn = Attention(config)
@@ -206,7 +183,6 @@ class MiniMindBlock(nn.Module):
         self.post_attention_layernorm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.mlp = FeedForward(config) if not config.use_moe else MOEFeedForward(config)
 
-    # 기능: MiniMindBlock에서 attention residual과 FFN/MoE residual을 차례로 적용합니다.
     def forward(self, hidden_states, position_embeddings, past_key_value=None, use_cache=False, attention_mask=None):
         residual = hidden_states
         hidden_states, present_key_value = self.self_attn(
@@ -217,9 +193,7 @@ class MiniMindBlock(nn.Module):
         hidden_states = hidden_states + self.mlp(self.post_attention_layernorm(hidden_states))
         return hidden_states, present_key_value
 
-# 역할: `MiniMindModel` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
 class MiniMindModel(nn.Module):
-    # 기능: MiniMindModel token embedding, Transformer blocks, final norm, RoPE cache를 초기화합니다.
     def __init__(self, config: MiniMindConfig):
         super().__init__()
         self.config = config
@@ -232,7 +206,6 @@ class MiniMindModel(nn.Module):
         self.register_buffer("freqs_cos", freqs_cos, persistent=False)
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
 
-    # 기능: MiniMindModel에서 token embedding을 전체 Transformer block에 통과시킵니다.
     def forward(self, input_ids, attention_mask=None, past_key_values=None, use_cache=False, **kwargs):
         batch_size, seq_length = input_ids.shape
         if hasattr(past_key_values, 'layers'): past_key_values = None
@@ -258,11 +231,9 @@ class MiniMindModel(nn.Module):
         aux_loss = sum([l.mlp.aux_loss for l in self.layers if isinstance(l.mlp, MOEFeedForward)], hidden_states.new_zeros(1).squeeze())
         return hidden_states, presents, aux_loss
 
-# 역할: `MiniMindForCausalLM` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
 class MiniMindForCausalLM(PreTrainedModel, GenerationMixin):
     config_class = MiniMindConfig
     _tied_weights_keys = {"lm_head.weight": "model.embed_tokens.weight"}
-    # 기능: MiniMindForCausalLM 본체 모델과 LM head를 연결합니다.
     def __init__(self, config: MiniMindConfig = None):
         self.config = config or MiniMindConfig()
         super().__init__(self.config)
@@ -271,7 +242,6 @@ class MiniMindForCausalLM(PreTrainedModel, GenerationMixin):
         if self.config.tie_word_embeddings: self.model.embed_tokens.weight = self.lm_head.weight
         self.post_init()
 
-    # 기능: MiniMindForCausalLM에서 hidden state를 vocab logits로 변환하고 labels가 있으면 LM loss를 계산합니다.
     def forward(self, input_ids, attention_mask=None, past_key_values=None, use_cache=False, logits_to_keep=0, labels=None, **kwargs):
         hidden_states, past_key_values, aux_loss = self.model(input_ids, attention_mask, past_key_values, use_cache, **kwargs)
         slice_indices = slice(-logits_to_keep, None) if isinstance(logits_to_keep, int) else logits_to_keep
@@ -283,7 +253,6 @@ class MiniMindForCausalLM(PreTrainedModel, GenerationMixin):
         return MoeCausalLMOutputWithPast(loss=loss, aux_loss=aux_loss, logits=logits, past_key_values=past_key_values, hidden_states=hidden_states)
     
     # https://github.com/jingyaogong/minimind/discussions/611
-    # 기능: generate 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     @torch.inference_mode()
     def generate(self, inputs=None, attention_mask=None, max_new_tokens=8192, temperature=0.85, top_p=0.85, top_k=50, eos_token_id=2, streamer=None, use_cache=True, num_return_sequences=1, do_sample=True, repetition_penalty=1.0, **kwargs):
         input_ids = kwargs.pop("input_ids", inputs).repeat(num_return_sequences, 1)

@@ -20,8 +20,7 @@ from torch.nn.parallel import DistributedDataParallel
 from transformers import AutoTokenizer
 
 
-# ===== 각 토큰의 logprob 계산 =====
-# 기능: 생성된 응답 token 위치의 log probability를 model logits에서 gather합니다.
+# ===== 计算每个 token 的 logprob =====
 def compute_per_token_logps(model, input_ids: Tensor, n_keep: int, attention_mask: Optional[Tensor] = None) -> Tensor:
     if n_keep <= 0:
         return input_ids.new_empty((input_ids.size(0), 0), dtype=torch.float32)
@@ -37,8 +36,7 @@ def compute_per_token_logps(model, input_ids: Tensor, n_keep: int, attention_mas
     return torch.stack(per_token_logps)
 
 
-# ===== Rollout 엔진 관련 처리 =====
-# 역할: `RolloutResult` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
+# ===== Rollout 结果 =====
 @dataclass
 class RolloutResult:
     output_ids: Tensor
@@ -49,33 +47,27 @@ class RolloutResult:
     completion_mask: Tensor
 
 
-# ===== Rollout 엔진 추상 기본 클래스 =====
-# 역할: `RolloutEngine` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
+# ===== Rollout 引擎抽象基类 =====
 class RolloutEngine(ABC):
     tokenizer = None
     
-    # 기능: rollout 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     @abstractmethod
     def rollout(self, prompt_ids: Tensor, attention_mask: Tensor, num_generations: int, max_new_tokens: int, temperature: float = 0.8) -> RolloutResult:
         pass
     
-    # 기능: update_policy 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     @abstractmethod
     def update_policy(self, model: torch.nn.Module):
         pass
 
 
-# ===== PyTorch 네이티브 추론 엔진 =====
-# 역할: `TorchRolloutEngine` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
+# ===== PyTorch 原生推理引擎 =====
 class TorchRolloutEngine(RolloutEngine):
-    # 기능: TorchRolloutEngine 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, policy_model: torch.nn.Module, tokenizer, device: str = "cuda", autocast_ctx=None):
         self.policy_model = policy_model
         self.tokenizer = tokenizer
         self.device = device
         self.autocast_ctx = autocast_ctx
     
-    # 기능: rollout 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def rollout(self, prompt_ids: Tensor, attention_mask: Tensor, num_generations: int, max_new_tokens: int, temperature: float = 0.8) -> RolloutResult:
         model = self.policy_model.module if isinstance(self.policy_model, DistributedDataParallel) else self.policy_model
         ctx = self.autocast_ctx if self.autocast_ctx else nullcontext()
@@ -99,15 +91,12 @@ class TorchRolloutEngine(RolloutEngine):
                              prompt_ids.new_full((output_ids.size(0),), prompt_len),
                              attention_mask.new_ones(output_ids.size(0), completion_ids.size(1)))
     
-    # 기능: update_policy 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def update_policy(self, model: torch.nn.Module):
         self.policy_model = model
 
 
-# 해당 단계의 처리 흐름을 설명
-# 역할: `SGLangRolloutEngine` 관련 설정, 하위 모듈, 실행 상태를 하나의 객체로 묶어 관리합니다.
+# ===== SGLang HTTP API 推理引擎 =====
 class SGLangRolloutEngine(RolloutEngine):
-    # 기능: SGLangRolloutEngine 객체가 사용할 계층과 상태를 초기화합니다.
     def __init__(self, base_url: str, model_path: str, shared_ckpt_path: str = "./sglang_ckpt", timeout: int = 120):
         self.base_url = base_url.rstrip('/')
         self.shared_ckpt_path = shared_ckpt_path
@@ -115,9 +104,8 @@ class SGLangRolloutEngine(RolloutEngine):
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         self.http = requests
     
-    # 기능: rollout 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def rollout(self, prompt_ids: Tensor, attention_mask: Tensor, num_generations: int, max_new_tokens: int, temperature: float = 0.8) -> RolloutResult:
-        # 해당 단계의 처리 흐름을 설명
+        # 去除左侧 padding tokens，只保留有效 token
         input_ids_list = []
         for ids, mask in zip(prompt_ids, attention_mask):
             valid_ids = ids[mask.bool()].tolist()
@@ -171,7 +159,6 @@ class SGLangRolloutEngine(RolloutEngine):
         max_comp_len = max(1, max(len(ids) for ids in all_completion_ids))
         max_out_len = max(len(ids) for ids in all_input_ids) + max_comp_len
         
-        # 기능: 길이가 다른 token/logprob 목록을 같은 길이의 tensor로 padding합니다.
         def pad_to_tensor(seqs, max_len, pad_val=0):
             return torch.tensor([s + [pad_val] * (max_len - len(s)) for s in seqs], device=device)
         
@@ -185,7 +172,6 @@ class SGLangRolloutEngine(RolloutEngine):
             completion_mask=torch.tensor([[1] * len(ids) + [0] * (max_comp_len - len(ids)) for ids in all_completion_ids], device=device),
         )
     
-    # 기능: update_policy 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def update_policy(self, model: torch.nn.Module):
         ok = True
         if not dist.is_initialized() or dist.get_rank() == 0:
@@ -207,12 +193,10 @@ class SGLangRolloutEngine(RolloutEngine):
         if not ok: raise RuntimeError("SGLang update_policy failed")
         return ok
     
-    # 기능: flush_cache 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def flush_cache(self) -> bool:
         resp = self.http.post(f"{self.base_url}/flush_cache", timeout=30)
         return resp.status_code == 200
     
-    # 기능: health 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def health(self) -> bool:
         try:
             resp = self.http.get(f"{self.base_url}/health", timeout=5)
@@ -221,8 +205,7 @@ class SGLangRolloutEngine(RolloutEngine):
             return False
 
 
-# ===== Rollout 엔진 팩토리 함수 =====
-# 기능: create_rollout_engine 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
+# ===== 工厂函数 =====
 def create_rollout_engine(
     engine_type: str = "torch",
     policy_model: torch.nn.Module = None,

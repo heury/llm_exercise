@@ -1,11 +1,3 @@
-"""
-MiniMind DPO (Direct Preference Optimization) 학습 스크립트
-
-참조 모델(ref_model)과 정책 모델(policy_model)의 로그 확률을 비교하여
-선호(chosen) 응답과 비선호(rejected) 응답 간의 차이를 최적화한다.
-분산 학습(DDP), 혼합 정밀도, 체크포인트 이어 학습 등을 지원한다.
-"""
-
 import os
 import sys
 
@@ -30,7 +22,6 @@ from trainer.trainer_utils import get_lr, Logger, is_main_process, lm_checkpoint
 warnings.filterwarnings('ignore')
 
 
-# 기능: label token 위치의 log probability를 logits에서 추출하고 mask를 적용합니다.
 def logits_to_log_probs(logits, labels):
     # logits shape: (batch_size, seq_len, vocab_size)
     # labels shape: (batch_size, seq_len)
@@ -40,13 +31,12 @@ def logits_to_log_probs(logits, labels):
     return log_probs_per_token
 
 
-# 기능: chosen/rejected의 policy-reference log ratio 차이로 DPO 선호 손실을 계산합니다.
 def dpo_loss(ref_log_probs, policy_log_probs, mask, beta):
-    # 해당 단계의 처리 흐름을 설명
+    # ref_log_probs 和 policy_log_probs 都是 shape: (batch_size, seq_len)
     ref_log_probs = (ref_log_probs * mask).sum(dim=1)
     policy_log_probs = (policy_log_probs * mask).sum(dim=1)
 
-    # chosen 데이터와 rejected 데이터를 분리
+    # 将 chosen 和 rejected 数据分开
     batch_size = ref_log_probs.shape[0]
     chosen_ref_log_probs = ref_log_probs[:batch_size // 2]
     reject_ref_log_probs = ref_log_probs[batch_size // 2:]
@@ -60,7 +50,6 @@ def dpo_loss(ref_log_probs, policy_log_probs, mask, beta):
     return loss.mean()
 
 
-# 기능: train_epoch 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def train_epoch(epoch, loader, iters, ref_model, lm_config, start_step=0, wandb=None, beta=0.1):
     start_time = time.time()
     last_step = start_step
@@ -124,7 +113,7 @@ def train_epoch(epoch, loader, iters, ref_model, lm_config, start_step=0, wandb=
             raw_model = getattr(raw_model, '_orig_mod', raw_model)
             state_dict = raw_model.state_dict()
             torch.save({k: v.half().cpu() for k, v in state_dict.items()}, ckp)
-            lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer, scaler=scaler, epoch=epoch, step=step, wandb=wandb, save_dir='../../minimind_out/checkpoints')
+            lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer, scaler=scaler, epoch=epoch, step=step, wandb=wandb, save_dir='../checkpoints')
             model.train()
             del state_dict
 
@@ -141,7 +130,7 @@ def train_epoch(epoch, loader, iters, ref_model, lm_config, start_step=0, wandb=
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind DPO (Direct Preference Optimization)")
-    parser.add_argument("--save_dir", type=str, default="../../minimind_out", help="模型保存目录")
+    parser.add_argument("--save_dir", type=str, default="../out", help="模型保存目录")
     parser.add_argument('--save_weight', default='dpo', type=str, help="保存权重的前缀名")
     parser.add_argument("--epochs", type=int, default=1, help="训练轮数")
     parser.add_argument("--batch_size", type=int, default=4, help="batch size")
@@ -157,7 +146,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_hidden_layers', default=8, type=int, help="隐藏层数量")
     parser.add_argument('--max_seq_len', default=1024, type=int, help="训练的最大截断长度（中文1token≈1.5~1.7字符）")
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="是否使用MoE架构（0=否，1=是）")
-    parser.add_argument("--data_path", type=str, default="../../minimind_dataset/dpo.jsonl", help="DPO训练数据路径")
+    parser.add_argument("--data_path", type=str, default="../dataset/dpo.jsonl", help="DPO训练数据路径")
     parser.add_argument('--from_weight', default='full_sft', type=str, help="基于哪个权重训练")
     parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="是否自动检测&续训（0=否，1=是）")
     parser.add_argument('--beta', default=0.15, type=float, help="DPO中的beta参数")
@@ -166,22 +155,22 @@ if __name__ == "__main__":
     parser.add_argument("--use_compile", default=0, type=int, choices=[0, 1], help="是否使用torch.compile加速（0=否，1=是）")
     args = parser.parse_args()
 
-# ========== 1. 환경과 난수 시드 초기화 ==========
+    # ========== 1. 初始化环境和随机种子 ==========
     local_rank = init_distributed_mode()
     if dist.is_initialized(): args.device = f"cuda:{local_rank}"
     setup_seed(42 + (dist.get_rank() if dist.is_initialized() else 0))
     
-# ========== 2. 디렉터리와 모델 파라미터 설정 및 체크포인트 확인 ==========
+    # ========== 2. 配置目录、模型参数、检查ckp ==========
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config = MiniMindConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers, use_moe=bool(args.use_moe))
-    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../../minimind_out/checkpoints') if args.from_resume==1 else None
+    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../checkpoints') if args.from_resume==1 else None
     
-# ========== 3. 혼합 정밀도 설정 ==========
+    # ========== 3. 设置混合精度 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"
     dtype = torch.bfloat16 if args.dtype == "bfloat16" else torch.float16
     autocast_ctx = nullcontext() if device_type == "cpu" else torch.cuda.amp.autocast(dtype=dtype)
     
-# ========== 4. wandb 설정 ==========
+    # ========== 4. 配wandb ==========
     wandb = None
     if args.use_wandb and is_main_process():
         import swanlab as wandb
@@ -190,10 +179,10 @@ if __name__ == "__main__":
         wandb_run_name = f"MiniMind-DPO-Epoch-{args.epochs}-BatchSize-{args.batch_size}-LR-{args.learning_rate}"
         wandb.init(project=args.wandb_project, name=wandb_run_name, id=wandb_id, resume=resume)
     
-# ========== 5. 모델과 참조 모델 정의 ==========
+    # ========== 5. 定义模型和参考模型 ==========
     model, tokenizer = init_model(lm_config, args.from_weight, device=args.device)
     Logger(f'策略模型总参数量：{sum(p.numel() for p in model.parameters()) / 1e6:.3f} M')
-    # 참조 모델 초기화(ref_model은 동결)
+    # 初始化参考模型（ref_model冻结）
     ref_model, _ = init_model(lm_config, args.from_weight, device=args.device)
     ref_model.eval()
     ref_model.requires_grad_(False)
@@ -204,7 +193,7 @@ if __name__ == "__main__":
     scaler = torch.cuda.amp.GradScaler(enabled=(args.dtype == 'float16'))
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate)
     
-# ========== 6. 체크포인트에서 상태 복원 ==========
+    # ========== 6. 从ckp恢复状态 ==========
     start_epoch, start_step = 0, 0
     if ckp_data:
         model.load_state_dict(ckp_data['model'])
@@ -213,14 +202,14 @@ if __name__ == "__main__":
         start_epoch = ckp_data['epoch']
         start_step = ckp_data.get('step', 0)
     
-# ========== 7. 컴파일 및 분산 래핑 ==========
+    # ========== 7. 编译和分布式包装 ==========
     if args.use_compile == 1:
         model = torch.compile(model)
         Logger('torch.compile enabled')
     if dist.is_initialized():
         model = DistributedDataParallel(model, device_ids=[local_rank])
     
-# ========== 8. 학습 시작 ==========
+    # ========== 8. 开始训练 ==========
     for epoch in range(start_epoch, args.epochs):
         train_sampler and train_sampler.set_epoch(epoch)
         setup_seed(42 + epoch); indices = torch.randperm(len(train_ds)).tolist()
@@ -233,7 +222,7 @@ if __name__ == "__main__":
         else:
             train_epoch(epoch, loader, len(loader), ref_model, lm_config, 0, wandb, args.beta)
     
-# ========== 9. 분산 프로세스 정리 ==========
+    # ========== 9. 清理分布进程 ==========
     if dist.is_initialized():
         dist.barrier()
         dist.destroy_process_group()
