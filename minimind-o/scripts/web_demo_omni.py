@@ -37,7 +37,40 @@ voices_data = {}
 builtin_voices, clone_voices = set(), set()
 
 
-# 기능: frames_to_mimi 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
+def default_device():
+    if torch.cuda.is_available():
+        return 'cuda'
+    if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        return 'mps'
+    return 'cpu'
+
+
+def resolve_aux_device(value, fallback):
+    if value and value != 'auto':
+        return value
+    return fallback
+
+
+def get_device_type(value):
+    return torch.device(value).type
+
+
+def normalize_audio(samples, sr, target_sr=16000):
+    if len(samples.shape) > 1:
+        samples = samples.mean(axis=1)
+    if np.issubdtype(samples.dtype, np.integer):
+        max_value = max(abs(np.iinfo(samples.dtype).min), np.iinfo(samples.dtype).max)
+        samples = samples.astype(np.float32) / max_value
+    else:
+        samples = samples.astype(np.float32)
+        peak = np.abs(samples).max() if samples.size else 0
+        if peak > 1.0:
+            samples = samples / peak
+    if sr != target_sr:
+        samples = librosa.resample(samples.astype(float), orig_sr=sr, target_sr=target_sr).astype(np.float32)
+    return np.ascontiguousarray(samples, dtype=np.float32)
+
+
 def frames_to_mimi(frames):
     codes = [f for f in frames if f and len(f) == 8]
     if not codes:
@@ -45,7 +78,6 @@ def frames_to_mimi(frames):
     return torch.tensor(codes, dtype=torch.long).T.unsqueeze(0)
 
 
-# 기능: decode_mimi 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def decode_mimi(mimi_codes):
     if mimi_codes is None or mimi_codes.numel() == 0:
         return None
@@ -55,7 +87,6 @@ def decode_mimi(mimi_codes):
     return audio.squeeze().float().cpu().numpy()
 
 
-# 기능: scan_hf_models에서 지정 경로를 탐색해 사용 가능한 항목을 수집합니다.
 def scan_hf_models(base_dir):
     models = {}
     base_dir = os.path.abspath(base_dir)
@@ -70,7 +101,6 @@ def scan_hf_models(base_dir):
     return models
 
 
-# 기능: load_hf_model에서 필요한 model, tokenizer, 설정, resource를 로드합니다.
 def load_hf_model(model_path):
     global model, tokenizer
     with model_lock:
@@ -94,7 +124,6 @@ def load_hf_model(model_path):
         return f"已加载: {name} ({params:.2f}M)"
 
 
-# 기능: load_voices에서 필요한 model, tokenizer, 설정, resource를 로드합니다.
 def load_voices():
     global voices_data, builtin_voices, clone_voices
     voices_data = {}
@@ -109,7 +138,6 @@ def load_voices():
                     (builtin_voices if is_builtin else clone_voices).add(speaker)
 
 
-# 기능: chat_stream 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def chat_stream(prompt, audio_input=None, image_input=None, voice_name="default", history=None, temperature=0.85, max_tokens=512):
     audio_inputs, audio_lens, pixel_values, ref_codes, spk_emb = None, None, None, None, None
     asr_result = [None]
@@ -117,12 +145,7 @@ def chat_stream(prompt, audio_input=None, image_input=None, voice_name="default"
 
     if audio_input is not None:
         sr, samples = audio_input
-        if len(samples.shape) > 1:
-            samples = samples.mean(axis=1)
-        if samples.dtype != np.float32:
-            samples = samples.astype(np.float32) / max(np.abs(samples).max(), 1)
-        if sr != 16000:
-            samples = librosa.resample(samples.astype(float), orig_sr=sr, target_sr=16000).astype(np.float32)
+        samples = normalize_audio(samples, sr)
         inputs = model.audio_processor(samples, sampling_rate=16000, return_tensors="pt", return_attention_mask=True)
         mel = inputs.input_features.squeeze(0)
         valid_len = inputs.attention_mask.sum().item()
@@ -131,7 +154,6 @@ def chat_stream(prompt, audio_input=None, image_input=None, voice_name="default"
         audio_token_len = valid_len or 1
         prompt = model.config.audio_special_token * audio_token_len
         samples_for_asr = samples.copy()
-        # 기능: _do_asr 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
         def _do_asr():
             r = asr_model.generate(input=samples_for_asr, cache={}, language='auto', use_itn=True)
             asr_result[0] = rich_transcription_postprocess(r[0]['text']).strip() if r else ''
@@ -187,13 +209,11 @@ def chat_stream(prompt, audio_input=None, image_input=None, voice_name="default"
     yield None, None, asr_result[0]
 
 
-# 기능: launch_gradio 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def launch_gradio(server_name="0.0.0.0", server_port=8888):
     voice_choices = [("default", "default")]
     for s in sorted(builtin_voices): voice_choices.append((f"[内置] {s}", s))
     for s in sorted(clone_voices): voice_choices.append((f"[克隆] {s}", s))
 
-    # 기능: respond 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def respond(message, audio, voice, chat_history, model_history, max_turns):
         text = message.get("text", "") if isinstance(message, dict) else (message or "")
         files = message.get("files", []) if isinstance(message, dict) else []
@@ -272,16 +292,20 @@ def launch_gradio(server_name="0.0.0.0", server_port=8888):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="MiniMind-O Gradio Demo")
     parser.add_argument('--load_from', default='./', type=str, help="transformers模型扫描目录")
-    parser.add_argument('--audio_encoder', default='../../minimind_model/SenseVoiceSmall', type=str)
-    parser.add_argument('--vision_model', default='../../minimind_model/siglip2-base-p32-256-ve', type=str)
-    parser.add_argument('--mimi_path', default='../../minimind_model/mimi', type=str)
-    parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', type=str)
+    parser.add_argument('--audio_encoder', default='../model/SenseVoiceSmall', type=str)
+    parser.add_argument('--vision_model', default='../model/siglip2-base-p32-256-ve', type=str)
+    parser.add_argument('--mimi_path', default='../model/mimi', type=str)
+    parser.add_argument('--device', default=default_device(), type=str)
+    parser.add_argument('--asr_device', default='auto', type=str, help='ASR设备；auto 在 MPS 主设备下使用 cpu，其它情况跟随 --device')
+    parser.add_argument('--mimi_device', default='auto', type=str, help='Mimi 解码设备；auto 跟随 --device')
     parser.add_argument('--open_thinking', default=0, type=int, choices=[0, 1])
     parser.add_argument('--top_p', default=0.85, type=float)
     parser.add_argument('--port', default=8888, type=int)
     args = parser.parse_args()
 
     device = args.device
+    asr_device = resolve_aux_device(args.asr_device, 'cpu' if get_device_type(device) == 'mps' else device)
+    mimi_device = resolve_aux_device(args.mimi_device, device)
     model_dict = scan_hf_models(args.load_from)
     if not model_dict:
         print(f"未在 {os.path.abspath(args.load_from)} 找到 transformers 模型")
@@ -290,14 +314,16 @@ if __name__ == '__main__':
     load_hf_model(model_dict[current_model_name])
 
     try:
-        mimi_model = MimiModel.from_pretrained(args.mimi_path).eval()
-        print('Mimi model loaded')
+        mimi_model = MimiModel.from_pretrained(args.mimi_path).eval().to(mimi_device)
+        if get_device_type(mimi_device) != 'cpu':
+            mimi_model = mimi_model.half()
+        print(f'Mimi model loaded on {mimi_device}')
     except Exception:
         mimi_model = None
         print('Mimi model not found, audio output disabled')
 
     with contextlib.redirect_stdout(io.StringIO()):
-        asr_model = AutoModel(model=args.audio_encoder, trust_remote_code=True, device=device, disable_update=True)
+        asr_model = AutoModel(model=args.audio_encoder, trust_remote_code=True, device=asr_device, disable_update=True)
     load_voices()
     print(f'Voices loaded: {list(voices_data.keys()) or "none"}')
     launch_gradio(server_port=args.port)

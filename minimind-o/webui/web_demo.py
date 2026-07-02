@@ -28,11 +28,8 @@ CLONE_VOICE = 'voice_clone'
 CLONE_FILE = 'voice_clone.pt'
 
 # -------- helpers --------
-# 기능: sse 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
-def sse(d):
-    return f"data: {json.dumps(d)}\n\n"
+def sse(d): return f"data: {json.dumps(d)}\n\n"
 
-# 기능: scan_hf_models에서 지정 경로를 탐색해 사용 가능한 항목을 수집합니다.
 def scan_hf_models(base_dir):
     models = {}
     base_dir = os.path.abspath(base_dir)
@@ -46,12 +43,10 @@ def scan_hf_models(base_dir):
             models[d] = full_path
     return models
 
-# 기능: asr_run 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def asr_run(samples):
     r = M['asr'].generate(input=samples, cache={}, language='auto', use_itn=True)
     return rich_transcription_postprocess(r[0]['text']).strip() if r else ''
 
-# 기능: prep_audio에서 원본 입력을 model/serving pipeline 입력 형식으로 전처리합니다.
 def prep_audio(samples):
     m = M['model']
     proc = m.audio_processor(samples, sampling_rate=16000, return_tensors="pt", return_attention_mask=True)
@@ -60,12 +55,10 @@ def prep_audio(samples):
     prompt = m.config.audio_special_token * (vlen or 1)
     return mel, torch.tensor([vlen], device=M['device']), prompt
 
-# 기능: prep_image에서 원본 입력을 model/serving pipeline 입력 형식으로 전처리합니다.
 def prep_image(b64):
     img = Image.open(io.BytesIO(base64.b64decode(b64))).convert('RGB')
     return {k: v.to(M['device']) for k, v in M['model'].vision_processor(images=img, return_tensors="pt").items()}
 
-# 기능: build_ids에서 입력 조각들을 조합해 model이 사용할 구조를 만듭니다.
 def build_ids(prompt, history):
     tok, dev, n = M['tokenizer'], M['device'], M['cfg'].max_history_turns
     hist = history[-n:] if n > 0 else []
@@ -73,7 +66,6 @@ def build_ids(prompt, history):
     t = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
     return torch.tensor(tok(t).data['input_ids'], dtype=torch.long, device=dev)[None, ...]
 
-# 기능: _mimi_decode 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def _mimi_decode(frames):
     codes = [f for f in frames if f and len(f) == 8]
     if not codes or not M['mimi']: return None
@@ -83,7 +75,6 @@ def _mimi_decode(frames):
         au = M['mimi'].decode(mc).audio_values.squeeze().cpu().numpy()
     return au, mc.shape[-1]
 
-# 기능: pcm_bytes 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def pcm_bytes(frames, ov):
     r = _mimi_decode(frames)
     if r is None: return None
@@ -91,8 +82,8 @@ def pcm_bytes(frames, ov):
     if ov > 0: au = au[int(ov * len(au) / T):]
     return (au * 32767).astype('int16').tobytes()
 
-# yield (pcm_bytes,) on chunk boundaries or on final flush.
 def stream_pcm(frames, flush=False):
+    """yield (pcm_bytes,) on chunk boundaries or on final flush."""
     if not M['mimi']: return
     cf, ov_max, n = M['cfg'].audio_chunk_frames, M['cfg'].audio_overlap, len(frames)
     if not flush and n >= cf and n % cf == 0:
@@ -106,7 +97,6 @@ def stream_pcm(frames, flush=False):
             p = pcm_bytes(frames[-(rem + ov):], ov)
             if p: yield p
 
-# 기능: voice_args 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def voice_args(name):
     if name and name != 'default' and name in V:
         v = V[name]
@@ -116,7 +106,6 @@ def voice_args(name):
         return {'ref_codes': rc, 'spk_emb': se}
     return {}
 
-# 기능: register_voice 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def register_voice(name, value, group='manual'):
     V[name] = value
     groups = {'builtin': V_builtin, 'unseen': V_unseen, 'manual': V_manual}
@@ -127,11 +116,9 @@ def register_voice(name, value, group='manual'):
         if k != group and name in lst:
             lst.remove(name)
 
-# 기능: clone_voice_path 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def clone_voice_path():
     return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'model', 'speaker', CLONE_FILE)
 
-# 기능: delete_manual_voice에서 요청된 resource의 삭제 가능 여부를 확인하고 제거합니다.
 def delete_manual_voice(name):
     if name not in V_manual:
         raise RuntimeError('只能删除手动克隆的音色')
@@ -144,7 +131,6 @@ def delete_manual_voice(name):
     if name in V_manual:
         V_manual.remove(name)
 
-# 기능: normalize_voice_name 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def normalize_voice_name(name):
     name = ' '.join(str(name or '').split())
     if not name:
@@ -157,7 +143,6 @@ def normalize_voice_name(name):
         raise RuntimeError('该名称已被现有音色占用，请换一个')
     return name
 
-# 기능: validate_clone_audio에서 후속 처리에 필요한 품질 조건을 검사합니다.
 def validate_clone_audio(w16):
     if w16.numel() < int(16000 * 1.8):
         raise RuntimeError('录音太短，请把整句话读完')
@@ -176,7 +161,6 @@ def validate_clone_audio(w16):
     if peak > 0.995:
         raise RuntimeError('录音有爆音，请离麦克风远一点')
 
-# 기능: build_clone_voice에서 입력 조각들을 조합해 model이 사용할 구조를 만듭니다.
 def build_clone_voice(audio_b64):
     if M.get('mimi') is None or M.get('campplus') is None or M.get('mel_fn') is None:
         raise RuntimeError('Mimi 或 CAM++ 未加载')
@@ -206,14 +190,12 @@ def build_clone_voice(audio_b64):
         spk_emb = M['campplus'](feat).squeeze(0).cpu()
     return {'ref_codes': ref_codes, 'spk_emb': spk_emb}
 
-# 기능: run_generate에서 model 실행 또는 평가 routine을 수행합니다.
 def run_generate(x, audio_inputs, audio_lens, pixel_values, **kw):
     with MODEL_LOCK, torch.no_grad():
         yield from M['model'].generate(
             x, M['tokenizer'].eos_token_id, stream=True, return_audio_codes=True,
             audio_inputs=audio_inputs, audio_lens=audio_lens, pixel_values=pixel_values, **kw)
 
-# 기능: load_main_model에서 필요한 model, tokenizer, 설정, resource를 로드합니다.
 def load_main_model(model_path, model_name):
     with MODEL_LOCK:
         [sys.modules.pop(k) for k in list(sys.modules) if 'transformers_modules' in k]
@@ -221,8 +203,8 @@ def load_main_model(model_path, model_name):
         if torch.cuda.is_available(): torch.cuda.empty_cache()
         tok = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         m = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
-        vision_encoder, vision_processor = MiniMindOmni.load_vision('../../minimind_model/siglip2-base-p32-256-ve')
-        audio_encoder, audio_processor = MiniMindOmni.load_sensevoice('../../minimind_model/SenseVoiceSmall')
+        vision_encoder, vision_processor = MiniMindOmni.load_vision('../model/siglip2-base-p32-256-ve')
+        audio_encoder, audio_processor = MiniMindOmni.load_sensevoice('../model/SenseVoiceSmall')
         object.__setattr__(m, 'vision_encoder', vision_encoder)
         object.__setattr__(m, 'vision_processor', vision_processor)
         object.__setattr__(m, 'audio_encoder', audio_encoder)
@@ -235,8 +217,8 @@ def load_main_model(model_path, model_name):
         print(f'Loaded model: {model_name} ({params:.2f}M)')
         return round(params, 2)
 
-# 기능: prepare_turn에서 원본 입력을 model/serving pipeline 입력 형식으로 전처리합니다.
 def prepare_turn(text, samples, image_b64, do_asr_for_image):
+    """返回 (audio_inputs, audio_lens, pixel_values, prompt_for_model, user_text_for_history, asr_thread, asr_result)"""
     audio_inputs = audio_lens = pixel_values = None
     prompt = text or ''
     user_text = text or ''
@@ -249,9 +231,7 @@ def prepare_turn(text, samples, image_b64, do_asr_for_image):
             audio_inputs, audio_lens, prompt = prep_audio(samples)
             if M['cfg'].max_history_turns > 0:
                 sa = samples.copy()
-                # 기능: _a 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
-                def _a():
-                    asr_result[0] = asr_run(sa)
+                def _a(): asr_result[0] = asr_run(sa)
                 asr_thread = threading.Thread(target=_a); asr_thread.start()
     if image_b64:
         pixel_values = prep_image(image_b64)
@@ -260,26 +240,19 @@ def prepare_turn(text, samples, image_b64, do_asr_for_image):
     return audio_inputs, audio_lens, pixel_values, prompt, user_text, asr_thread, asr_result
 
 # -------- routes --------
-# 기능: index 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 @app.route('/')
-def index():
-    return send_from_directory('.', 'web_demo.html')
-# 기능: call_page 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
+def index(): return send_from_directory('.', 'web_demo.html')
 @app.route('/call')
-def call_page():
-    return send_from_directory('.', 'web_demo.html')
+def call_page(): return send_from_directory('.', 'web_demo.html')
 
-# 기능: get_voices에서 현재 상태의 필요 값을 조회해 반환합니다.
 @app.route('/voices')
 def get_voices():
     return json.dumps({'builtin': sorted(V_builtin), 'unseen': sorted(V_unseen), 'manual': sorted(V_manual)})
 
-# 기능: get_models에서 현재 상태의 필요 값을 조회해 반환합니다.
 @app.route('/models')
 def get_models():
     return json.dumps({'models': list(M.get('models', {}).keys()), 'current': M.get('model_name')})
 
-# 기능: switch_model 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 @app.route('/switch_model', methods=['POST'])
 def switch_model():
     name = (request.json or {}).get('name')
@@ -291,7 +264,6 @@ def switch_model():
     except Exception as e:
         return Response(json.dumps({'ok': False, 'error': str(e)}), status=500, mimetype='application/json')
 
-# 기능: clone_voice 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 @app.route('/clone_voice', methods=['POST'])
 def clone_voice():
     d = request.json or {}
@@ -309,7 +281,6 @@ def clone_voice():
     except Exception as e:
         return Response(json.dumps({'ok': False, 'error': str(e)}), status=500, mimetype='application/json')
 
-# 기능: delete_voice에서 요청된 resource의 삭제 가능 여부를 확인하고 제거합니다.
 @app.route('/delete_voice', methods=['POST'])
 def delete_voice():
     d = request.json or {}
@@ -322,7 +293,6 @@ def delete_voice():
     except Exception as e:
         return Response(json.dumps({'ok': False, 'error': str(e)}), status=500, mimetype='application/json')
 
-# 기능: chat 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 @app.route('/chat', methods=['POST'])
 def chat():
     d = request.json
@@ -333,7 +303,6 @@ def chat():
         samples = np.frombuffer(seg.raw_data, dtype=np.int16).astype(np.float32) / 32768.0
     va = voice_args(d.get('voice', 'default'))
 
-    # 기능: gen 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def gen():
         audio_inputs, audio_lens, pixel_values, prompt, user_text, asr_th, asr_res = prepare_turn(
             d.get('text', ''), samples, d.get('image'), do_asr_for_image=True)
@@ -381,25 +350,21 @@ def chat():
     return Response(gen(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
 
-# 기능: realtime 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 @sock.route('/ws/realtime')
 def realtime(ws):
     session = RealtimeSession(M['vad_path'])
     q = queue.Queue(); alive = [True]; state = {'history': [], 'image': None}
     n_hist = M['cfg'].max_history_turns
 
-    # 기능: push_audio 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def push_audio(data):
         return session.push_chunk(np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0)
 
-    # 기능: set_ctx 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def set_ctx(msg):
         h = msg.get('history') or []
         state['history'] = h[-n_hist:] if n_hist > 0 else []
         if 'image' in msg: state['image'] = msg.get('image')
         if 'voice' in msg: state['voice'] = msg.get('voice', 'default')
 
-    # 기능: poll_interrupt 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def poll_interrupt():
         while True:
             try: data = q.get_nowait()
@@ -414,7 +379,6 @@ def realtime(ws):
                     if m['type'] == 'end': alive[0] = False
                     session.interrupt = True; return True
 
-    # 기능: recv_loop 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
     def recv_loop():
         while alive[0]:
             try:
@@ -476,11 +440,10 @@ def realtime(ws):
         alive[0] = False
 
 
-# 기능: init_model 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def init_model(args):
     M['cfg'] = args; M['device'] = args.device
     with contextlib.redirect_stdout(io.StringIO()):
-        M['asr'] = AutoModel(model='../../minimind_model/SenseVoiceSmall', trust_remote_code=True, device=args.device, disable_update=True)
+        M['asr'] = AutoModel(model='../model/SenseVoiceSmall', trust_remote_code=True, device=args.device, disable_update=True)
     M['models'] = scan_hf_models(args.load_from)
     if not M['models']:
         raise RuntimeError(f"未在 {os.path.abspath(args.load_from)} 找到 transformers 模型")
@@ -488,7 +451,7 @@ def init_model(args):
     load_main_model(M['models'][model_name], model_name)
     try:
         from transformers import MimiModel
-        M['mimi'] = MimiModel.from_pretrained('../../minimind_model/mimi').eval().to(args.device)
+        M['mimi'] = MimiModel.from_pretrained('../model/mimi').eval().to(args.device)
         if args.device != 'cpu': M['mimi'] = M['mimi'].half()
         print('Mimi model loaded')
     except: M['mimi'] = None
@@ -496,7 +459,7 @@ def init_model(args):
         from modelscope.models.audio.sv.DTDNN import CAMPPlus
         M['campplus'] = CAMPPlus(feat_dim=80, embedding_size=192, growth_rate=32, bn_size=4,
                                  init_channels=128, config_str='batchnorm-relu', memory_efficient=True)
-        sd = torch.load('../../minimind_model/campplus/campplus_cn_common.pt', map_location='cpu')
+        sd = torch.load('../model/campplus/campplus_cn_common.pt', map_location='cpu')
         M['campplus'].load_state_dict({k: v.float() for k, v in sd.items()})
         M['campplus'] = M['campplus'].eval().to(args.device)
         M['mel_fn'] = torchaudio.transforms.MelSpectrogram(
