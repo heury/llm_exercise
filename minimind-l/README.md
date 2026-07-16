@@ -49,7 +49,7 @@ python run_linear.py eval_llm.py --weight sft_linear
 minimind-l/
 ├── README.md                              # 본 문서
 ├── run_linear.py                          # 실행 엔트리포인트
-└── model/
+└── models/
     └── model_minimind_linear.py           # Linear Attention 모델 정의
 ```
 

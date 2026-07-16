@@ -128,16 +128,16 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ### 2' 下载资源
 
 ```bash
-# 下载 SenseVoice-Small 语音编码器到 ./model/SenseVoiceSmall
-modelscope download --model gongjy/SenseVoiceSmall --local_dir ./model/SenseVoiceSmall
-# 下载 SigLIP2 视觉编码器到 ./model/siglip2-base-p32-256-ve
-modelscope download --model gongjy/siglip2-base-p32-256-ve --local_dir ./model/siglip2-base-p32-256-ve
-# 下载 Mimi 音频编解码器到 ./model/mimi
-modelscope download --model gongjy/mimi --local_dir ./model/mimi
-# 下载 CAMPPlus 说话人编码器到 ./model/campplus
-modelscope download --model gongjy/campplus --local_dir ./model/campplus
-# 下载 MiniMind 语言模型权重到 ./out 目录下（作为训练 Omni 的基座语言模型）
-modelscope download --model gongjy/minimind-3o-pytorch llm_768.pth --local_dir ./out
+# 下载 SenseVoice-Small 语音编码器到 ./models/SenseVoiceSmall
+modelscope download --model gongjy/SenseVoiceSmall --local_dir ./models/SenseVoiceSmall
+# 下载 SigLIP2 视觉编码器到 ./models/siglip2-base-p32-256-ve
+modelscope download --model gongjy/siglip2-base-p32-256-ve --local_dir ./models/siglip2-base-p32-256-ve
+# 下载 Mimi 音频编解码器到 ./models/mimi
+modelscope download --model gongjy/mimi --local_dir ./models/mimi
+# 下载 CAMPPlus 说话人编码器到 ./models/campplus
+modelscope download --model gongjy/campplus --local_dir ./models/campplus
+# 下载 MiniMind 语言模型权重到 ./checkouts 目录下（作为训练 Omni 的基座语言模型）
+modelscope download --model gongjy/minimind-3o-pytorch llm_768.pth --local_dir ./checkouts
 ```
 
 注：也可从 [ModelScope Collection](https://modelscope.cn/collections/gongjy/MiniMind-O) 或 [HuggingFace Collection](https://huggingface.co/collections/jingyaogong/minimind-o) 选择对应内容 `git clone`（需LFS）下载，此处不再赘述。
@@ -146,13 +146,13 @@ modelscope download --model gongjy/minimind-3o-pytorch llm_768.pth --local_dir .
 
 ```text
 minimind-o/
-├── model/
+├── models/
 │   ├── SenseVoiceSmall/
 │   ├── siglip2-base-p32-256-ve/
 │   ├── mimi/
 │   ├── campplus/
 │   └── ...
-├── out/
+├── checkouts/
 │   └── llm_768.pth
 └── ...
 ```
@@ -162,8 +162,8 @@ minimind-o/
 ### 1' 下载发布权重
 
 ```bash
-# 下载发布权重到 ./out 目录下
-modelscope download --model gongjy/minimind-3o-pytorch --local_dir ./out
+# 下载发布权重到 ./checkouts 目录下
+modelscope download --model gongjy/minimind-3o-pytorch --local_dir ./checkouts
 ```
 
 ### 2' 命令行问答
@@ -205,21 +205,21 @@ print(torch.cuda.is_available())
 
 ### 1' 下载数据
 
-快速开始时，推荐从[数据集链接](https://huggingface.co/datasets/jingyaogong/minimind-o_dataset)只下载 `_mini` 数据集，并放到 `./dataset` 下。
+快速开始时，推荐从[数据集链接](https://huggingface.co/datasets/jingyaogong/minimind-o_dataset)只下载 `_mini` 数据集，并放到 `./datas` 下。
 
 ### 2' 开始训练
 
 推荐 mini 训练管线如下，默认在 `trainer/` 目录下执行，可直接 `cd trainer && bash train.sh`：
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 torchrun --master_port 29560 --nproc_per_node 1 train_sft_omni.py --learning_rate 5e-4 --data_path ../dataset/sft_t2a_mini.parquet --epochs 1 --batch_size 40 --use_compile 1 --from_weight llm --save_weight sft_zero --max_seq_len 512 --use_wandb --use_moe 0
-CUDA_VISIBLE_DEVICES=0 torchrun --master_port 29560 --nproc_per_node 1 train_sft_omni.py --learning_rate 5e-4 --data_path ../dataset/sft_a2a_mini.parquet --epochs 1 --batch_size 40 --use_compile 0 --from_weight sft_zero --save_weight sft_zero --max_seq_len 640 --mode audio_proj --use_wandb --use_moe 0
-CUDA_VISIBLE_DEVICES=0 torchrun --master_port 29560 --nproc_per_node 1 train_sft_omni.py --learning_rate 2e-5 --data_path ../dataset/sft_a2a_mini.parquet --epochs 1 --batch_size 16 --use_compile 0 --from_weight sft_zero --save_weight sft_zero --max_seq_len 768 --use_wandb --use_moe 0
+CUDA_VISIBLE_DEVICES=0 torchrun --master_port 29560 --nproc_per_node 1 train_sft_omni.py --learning_rate 5e-4 --data_path ../datas/sft_t2a_mini.parquet --epochs 1 --batch_size 40 --use_compile 1 --from_weight llm --save_weight sft_zero --max_seq_len 512 --use_wandb --use_moe 0
+CUDA_VISIBLE_DEVICES=0 torchrun --master_port 29560 --nproc_per_node 1 train_sft_omni.py --learning_rate 5e-4 --data_path ../datas/sft_a2a_mini.parquet --epochs 1 --batch_size 40 --use_compile 0 --from_weight sft_zero --save_weight sft_zero --max_seq_len 640 --mode audio_proj --use_wandb --use_moe 0
+CUDA_VISIBLE_DEVICES=0 torchrun --master_port 29560 --nproc_per_node 1 train_sft_omni.py --learning_rate 2e-5 --data_path ../datas/sft_a2a_mini.parquet --epochs 1 --batch_size 16 --use_compile 0 --from_weight sft_zero --save_weight sft_zero --max_seq_len 768 --use_wandb --use_moe 0
 ```
 
 ### 3' 测试已训练模型（可选）
 
-确保需要测试的模型 `*.pth` 文件已保存于 `./out/` 目录下。
+确保需要测试的模型 `*.pth` 文件已保存于 `./checkouts/` 目录下。
 
 ```bash
 python eval_omni.py --weight sft_omni

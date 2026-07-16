@@ -127,16 +127,16 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ### 2' Download resources
 
 ```bash
-# Download SenseVoice-Small audio encoder to ./model/SenseVoiceSmall
-modelscope download --model gongjy/SenseVoiceSmall --local_dir ./model/SenseVoiceSmall
-# Download SigLIP2 vision encoder to ./model/siglip2-base-p32-256-ve
-modelscope download --model gongjy/siglip2-base-p32-256-ve --local_dir ./model/siglip2-base-p32-256-ve
-# Download Mimi audio codec to ./model/mimi
-modelscope download --model gongjy/mimi --local_dir ./model/mimi
-# Download CAM++ speaker encoder to ./model/campplus
-modelscope download --model gongjy/campplus --local_dir ./model/campplus
-# Download MiniMind LLM weights to ./out (used as the language backbone for training Omni)
-modelscope download --model gongjy/minimind-3o-pytorch llm_768.pth --local_dir ./out
+# Download SenseVoice-Small audio encoder to ./models/SenseVoiceSmall
+modelscope download --model gongjy/SenseVoiceSmall --local_dir ./models/SenseVoiceSmall
+# Download SigLIP2 vision encoder to ./models/siglip2-base-p32-256-ve
+modelscope download --model gongjy/siglip2-base-p32-256-ve --local_dir ./models/siglip2-base-p32-256-ve
+# Download Mimi audio codec to ./models/mimi
+modelscope download --model gongjy/mimi --local_dir ./models/mimi
+# Download CAM++ speaker encoder to ./models/campplus
+modelscope download --model gongjy/campplus --local_dir ./models/campplus
+# Download MiniMind LLM weights to ./checkouts (used as the language backbone for training Omni)
+modelscope download --model gongjy/minimind-3o-pytorch llm_768.pth --local_dir ./checkouts
 ```
 
 You can also `git clone` the corresponding repos from the [ModelScope Collection](https://modelscope.cn/collections/gongjy/MiniMind-O) or [HuggingFace Collection](https://huggingface.co/collections/jingyaogong/minimind-o) (LFS required); details omitted here.
@@ -145,13 +145,13 @@ After downloading, the directory should look like:
 
 ```text
 minimind-o/
-├── model/
+├── models/
 │   ├── SenseVoiceSmall/
 │   ├── siglip2-base-p32-256-ve/
 │   ├── mimi/
 │   ├── campplus/
 │   └── ...
-├── out/
+├── checkouts/
 │   └── llm_768.pth
 └── ...
 ```
@@ -161,8 +161,8 @@ minimind-o/
 ### 1' Download released weights
 
 ```bash
-# Download released weights to ./out
-modelscope download --model gongjy/minimind-3o-pytorch --local_dir ./out
+# Download released weights to ./checkouts
+modelscope download --model gongjy/minimind-3o-pytorch --local_dir ./checkouts
 ```
 
 ### 2' Command-line chat
@@ -206,21 +206,21 @@ If unavailable, please download the matching `.whl` from [torch_stable](https://
 
 ### 1' Download data
 
-For a quick start, downloading only the `_mini` parquet files from the [dataset link](https://huggingface.co/datasets/jingyaogong/minimind-o_dataset) and placing them under `./dataset` is enough.
+For a quick start, downloading only the `_mini` parquet files from the [dataset link](https://huggingface.co/datasets/jingyaogong/minimind-o_dataset) and placing them under `./datas` is enough.
 
 ### 2' Train
 
 The recommended mini training pipeline is shown below. It is meant to be run from the `trainer/` directory; equivalently, run `cd trainer && bash train.sh`:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 torchrun --master_port 29560 --nproc_per_node 1 train_sft_omni.py --learning_rate 5e-4 --data_path ../dataset/sft_t2a_mini.parquet --epochs 1 --batch_size 40 --use_compile 1 --from_weight llm --save_weight sft_zero --max_seq_len 512 --use_wandb --use_moe 0
-CUDA_VISIBLE_DEVICES=0 torchrun --master_port 29560 --nproc_per_node 1 train_sft_omni.py --learning_rate 5e-4 --data_path ../dataset/sft_a2a_mini.parquet --epochs 1 --batch_size 40 --use_compile 0 --from_weight sft_zero --save_weight sft_zero --max_seq_len 640 --mode audio_proj --use_wandb --use_moe 0
-CUDA_VISIBLE_DEVICES=0 torchrun --master_port 29560 --nproc_per_node 1 train_sft_omni.py --learning_rate 2e-5 --data_path ../dataset/sft_a2a_mini.parquet --epochs 1 --batch_size 16 --use_compile 0 --from_weight sft_zero --save_weight sft_zero --max_seq_len 768 --use_wandb --use_moe 0
+CUDA_VISIBLE_DEVICES=0 torchrun --master_port 29560 --nproc_per_node 1 train_sft_omni.py --learning_rate 5e-4 --data_path ../datas/sft_t2a_mini.parquet --epochs 1 --batch_size 40 --use_compile 1 --from_weight llm --save_weight sft_zero --max_seq_len 512 --use_wandb --use_moe 0
+CUDA_VISIBLE_DEVICES=0 torchrun --master_port 29560 --nproc_per_node 1 train_sft_omni.py --learning_rate 5e-4 --data_path ../datas/sft_a2a_mini.parquet --epochs 1 --batch_size 40 --use_compile 0 --from_weight sft_zero --save_weight sft_zero --max_seq_len 640 --mode audio_proj --use_wandb --use_moe 0
+CUDA_VISIBLE_DEVICES=0 torchrun --master_port 29560 --nproc_per_node 1 train_sft_omni.py --learning_rate 2e-5 --data_path ../datas/sft_a2a_mini.parquet --epochs 1 --batch_size 16 --use_compile 0 --from_weight sft_zero --save_weight sft_zero --max_seq_len 768 --use_wandb --use_moe 0
 ```
 
 ### 3' Test the trained model (optional)
 
-Make sure the model `*.pth` to be tested is placed under `./out/`.
+Make sure the model `*.pth` to be tested is placed under `./checkouts/`.
 
 ```bash
 python eval_omni.py --weight sft_omni

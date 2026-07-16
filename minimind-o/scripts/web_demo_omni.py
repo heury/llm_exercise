@@ -120,8 +120,8 @@ def load_hf_model(model_path):
             model.vision_encoder.to(device)
         name = os.path.basename(model_path)
         params = sum(p.numel() for p in model.parameters()) / 1e6
-        print(f'已加载 {name}，参数量：{params:.2f}M')
-        return f"已加载: {name} ({params:.2f}M)"
+        print(f'로드됨 {name}，파라미터 수：{params:.2f}M')
+        return f"로드됨: {name} ({params:.2f}M)"
 
 
 def load_voices():
@@ -129,7 +129,7 @@ def load_voices():
     voices_data = {}
     builtin_voices, clone_voices = set(), set()
     for name, is_builtin in [('voices.pt', True), ('voices_unseen.pt', False)]:
-        path = os.path.join('C:/dev/llm_exercise/minimind_model/speaker', name)
+        path = os.path.join('../../models/speaker', name)
         if os.path.exists(path):
             data = torch.load(path, map_location=device)
             for speaker, v in data.items():
@@ -211,8 +211,8 @@ def chat_stream(prompt, audio_input=None, image_input=None, voice_name="default"
 
 def launch_gradio(server_name="0.0.0.0", server_port=8888):
     voice_choices = [("default", "default")]
-    for s in sorted(builtin_voices): voice_choices.append((f"[内置] {s}", s))
-    for s in sorted(clone_voices): voice_choices.append((f"[克隆] {s}", s))
+    for s in sorted(builtin_voices): voice_choices.append((f"[내장] {s}", s))
+    for s in sorted(clone_voices): voice_choices.append((f"[복제] {s}", s))
 
     def respond(message, audio, voice, chat_history, model_history, max_turns):
         text = message.get("text", "") if isinstance(message, dict) else (message or "")
@@ -220,7 +220,7 @@ def launch_gradio(server_name="0.0.0.0", server_port=8888):
         img_path = next((f for f in files if any(f.lower().endswith(e) for e in ('.png','.jpg','.jpeg','.gif','.bmp','.webp'))), None)
 
         if not text and audio is None and img_path is None:
-            yield chat_history + [{"role": "assistant", "content": "请输入文本、上传图片或录制音频"}], gr.update(), gr.update(), model_history, ""
+            yield chat_history + [{"role": "assistant", "content": "텍스트를 입력하거나 이미지를 업로드하거나 오디오를 녹음해 주세요"}], gr.update(), gr.update(), model_history, ""
             return
 
         if audio is not None:
@@ -230,7 +230,7 @@ def launch_gradio(server_name="0.0.0.0", server_port=8888):
             sf.write(wav_path, display_samples, sr)
             chat_history = chat_history + [{"role": "user", "content": {"path": wav_path}}]
         elif img_path:
-            chat_history = chat_history + [{"role": "user", "content": {"path": img_path}}, {"role": "user", "content": text or "请描述这张图片"}]
+            chat_history = chat_history + [{"role": "user", "content": {"path": img_path}}, {"role": "user", "content": text or "이 이미지를 설명해 주세요."}]
         else:
             chat_history = chat_history + [{"role": "user", "content": text}]
 
@@ -250,7 +250,7 @@ def launch_gradio(server_name="0.0.0.0", server_port=8888):
                 chat_history[-1]["content"] = response_text
                 yield chat_history, gr.update(), None, model_history, gr.update()
             if audio_data == "loading_audio":
-                yield chat_history, gr.update(), None, model_history, '<div style="text-align:center;padding:10px 0;color:#aaa;font-size:13px;animation:pulse 1.5s ease-in-out infinite">正在组装语音（受限于 Gradio 特性，此处为非流式解码）...</div>'
+                yield chat_history, gr.update(), None, model_history, '<div style="text-align:center;padding:10px 0;color:#aaa;font-size:13px;animation:pulse 1.5s ease-in-out infinite">음성을 조립하는 중입니다(Gradio 특성상 여기서는 비스트리밍 디코딩)...</div>'
             elif audio_data:
                 final_audio = audio_data
             if asr is not None:
@@ -264,24 +264,24 @@ def launch_gradio(server_name="0.0.0.0", server_port=8888):
 
         yield chat_history, final_audio if final_audio else gr.update(), None, model_history, ""
 
-    with gr.Blocks(title="MiniMind-O", js="()=>{new MutationObserver(()=>{const m=document.getElementById('mic-box');if(!m)return;const h=!!m.querySelector('audio');document.body.classList.toggle('has-audio',h);const t=document.querySelector('textarea');if(t){t.placeholder=h?'已加载语音，点击发送':'输入文本';t.disabled=h}}).observe(document.body,{childList:true,subtree:true})}", css=".app{padding-top:6px!important} #component-0{gap:6px!important} #component-1{padding:2px 0!important;margin:0!important;min-height:0!important;border:none!important} #component-1 .padding{padding:0!important} #chatbox img{max-width:120px!important;max-height:120px!important;border-radius:8px} textarea{overflow-y:hidden!important;height:auto!important;min-height:30px!important;max-height:60px!important} #mic-box{max-height:150px!important;overflow:hidden!important} #mic-box .wrap span.or,#mic-box .wrap span:first-child{display:none!important} #mic-box .wrap{font-size:0!important;min-height:40px!important;padding:8px!important} #mic-box .wrap::after{content:'上传/录音';font-size:14px!important} #mic-box .mic-select{display:none!important} .has-audio textarea{opacity:0.4!important;pointer-events:none!important} .has-audio .upload-button,.has-audio [data-testid='upload-button']{display:none!important} @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}") as demo:
+    with gr.Blocks(title="MiniMind-O", js="()=>{new MutationObserver(()=>{const m=document.getElementById('mic-box');if(!m)return;const h=!!m.querySelector('audio');document.body.classList.toggle('has-audio',h);const t=document.querySelector('textarea');if(t){t.placeholder=h?'음성이 로드되었습니다. 전송을 클릭하세요':'텍스트 입력';t.disabled=h}}).observe(document.body,{childList:true,subtree:true})}", css=".app{padding-top:6px!important} #component-0{gap:6px!important} #component-1{padding:2px 0!important;margin:0!important;min-height:0!important;border:none!important} #component-1 .padding{padding:0!important} #chatbox img{max-width:120px!important;max-height:120px!important;border-radius:8px} textarea{overflow-y:hidden!important;height:auto!important;min-height:30px!important;max-height:60px!important} #mic-box{max-height:150px!important;overflow:hidden!important} #mic-box .wrap span.or,#mic-box .wrap span:first-child{display:none!important} #mic-box .wrap{font-size:0!important;min-height:40px!important;padding:8px!important} #mic-box .wrap::after{content:'업로드/녹음';font-size:14px!important} #mic-box .mic-select{display:none!important} .has-audio textarea{opacity:0.4!important;pointer-events:none!important} .has-audio .upload-button,.has-audio [data-testid='upload-button']{display:none!important} @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}") as demo:
         gr.HTML('<div style="text-align:center;margin:2px 0"><span style="font-size:1.2rem;font-weight:bold;font-style:italic">MiniMind-O</span> <span style="color:#999;font-size:0.8rem">text / image / audio → text + audio</span></div>')
 
         chatbot = gr.Chatbot(label="", height=380, elem_id="chatbox", type="messages")
         model_history = gr.State([])
         audio_status = gr.HTML("", elem_id="audio-status")
-        audio_out = gr.Audio(label="语音回复", autoplay=True, elem_id="audio-out")
+        audio_out = gr.Audio(label="음성 답변", autoplay=True, elem_id="audio-out")
         with gr.Row(equal_height=True):
             with gr.Column(scale=0, min_width=160):
                 aud = gr.Audio(sources=["upload", "microphone"], type="numpy", show_label=False, elem_id="mic-box")
             with gr.Column(scale=4):
-                msg = gr.MultimodalTextbox(placeholder="输入文本", show_label=False, submit_btn="发送")
+                msg = gr.MultimodalTextbox(placeholder="텍스트 입력", show_label=False, submit_btn="전송")
         with gr.Row():
-            voice_dd = gr.Dropdown(choices=voice_choices, value="default", label="音色选择", scale=0, min_width=140)
-            turns_dd = gr.Dropdown(choices=[0, 2, 4, 6, 8], value=0, label="多轮记忆", scale=0, min_width=120)
+            voice_dd = gr.Dropdown(choices=voice_choices, value="default", label="음색 선택", scale=0, min_width=140)
+            turns_dd = gr.Dropdown(choices=[0, 2, 4, 6, 8], value=0, label="멀티턴 기억", scale=0, min_width=120)
             if model_dict:
-                model_dd = gr.Dropdown(choices=list(model_dict.keys()), value=current_model_name, label="模型选择", scale=1, min_width=180)
-                status = gr.Textbox(value=f"已加载: {current_model_name}", label="状态", interactive=False, scale=2)
+                model_dd = gr.Dropdown(choices=list(model_dict.keys()), value=current_model_name, label="모델 선택", scale=1, min_width=180)
+                status = gr.Textbox(value=f"로드됨: {current_model_name}", label="상태", interactive=False, scale=2)
                 model_dd.change(lambda n: load_hf_model(model_dict[n]), [model_dd], [status])
 
         msg.submit(respond, [msg, aud, voice_dd, chatbot, model_history, turns_dd], [chatbot, audio_out, aud, model_history, audio_status])
@@ -290,14 +290,14 @@ def launch_gradio(server_name="0.0.0.0", server_port=8888):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="MiniMind-O Gradio Demo")
-    parser.add_argument('--load_from', default='C:/dev/llm_exercise/minimind_model', type=str, help="transformers模型扫描目录")
-    parser.add_argument('--audio_encoder', default='C:/dev/llm_exercise/minimind_model/SenseVoiceSmall', type=str)
-    parser.add_argument('--vision_model', default='C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve', type=str)
-    parser.add_argument('--mimi_path', default='C:/dev/llm_exercise/minimind_model/mimi', type=str)
+    parser = argparse.ArgumentParser(description="MiniMind-O Gradio 데모")
+    parser.add_argument('--load_from', default='../../models', type=str, help="transformers 모델 스캔 디렉터리")
+    parser.add_argument('--audio_encoder', default='../../models/SenseVoiceSmall', type=str)
+    parser.add_argument('--vision_model', default='../../models/siglip2-base-p32-256-ve', type=str)
+    parser.add_argument('--mimi_path', default='../../models/mimi', type=str)
     parser.add_argument('--device', default=default_device(), type=str)
-    parser.add_argument('--asr_device', default='auto', type=str, help='ASR设备；auto 在 MPS 主设备下使用 cpu，其它情况跟随 --device')
-    parser.add_argument('--mimi_device', default='auto', type=str, help='Mimi 解码设备；auto 跟随 --device')
+    parser.add_argument('--asr_device', default='auto', type=str, help='ASR 장치; auto는 MPS 주 장치에서 cpu를 사용하고, 그 외에는 --device를 따름')
+    parser.add_argument('--mimi_device', default='auto', type=str, help='Mimi 디코딩 장치; auto는 --device를 따름')
     parser.add_argument('--open_thinking', default=0, type=int, choices=[0, 1])
     parser.add_argument('--top_p', default=0.85, type=float)
     parser.add_argument('--port', default=8888, type=int)
@@ -308,7 +308,7 @@ if __name__ == '__main__':
     mimi_device = resolve_aux_device(args.mimi_device, device)
     model_dict = scan_hf_models(args.load_from)
     if not model_dict:
-        print(f"未在 {os.path.abspath(args.load_from)} 找到 transformers 模型")
+        print(f"다음 경로에서 {os.path.abspath(args.load_from)} transformers 모델을 찾지 못했습니다")
         exit(1)
     current_model_name = list(model_dict.keys())[0]
     load_hf_model(model_dict[current_model_name])
@@ -317,7 +317,7 @@ if __name__ == '__main__':
         mimi_model = MimiModel.from_pretrained(args.mimi_path).eval().to(mimi_device)
         if get_device_type(mimi_device) != 'cpu':
             mimi_model = mimi_model.half()
-        print(f'Mimi model loaded on {mimi_device}')
+        print(f'Mimi 모델 로드됨 on {mimi_device}')
     except Exception:
         mimi_model = None
         print('Mimi model not found, audio output disabled')

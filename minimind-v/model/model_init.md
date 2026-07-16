@@ -16,7 +16,7 @@ git clone https://modelscope.cn/models/gongjy/siglip2-base-p32-256-ve
 Directory Structure
 
 ```
-model/
+models/
 ├── siglip2-base-p32-256-ve/        # Vision Encoder (Required)
 │   ├── config.json
 │   ├── model.safetensors           # ~180MB, float16

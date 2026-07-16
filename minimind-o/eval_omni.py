@@ -25,18 +25,18 @@ def init_model(args):
                 num_hidden_layers=args.num_hidden_layers, 
                 use_moe=bool(args.use_moe)
             ),
-            audio_encoder_path="C:/dev/llm_exercise/minimind_model/SenseVoiceSmall",
-            vision_model_path="C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve"
+            audio_encoder_path="../models/SenseVoiceSmall",
+            vision_model_path="../models/siglip2-base-p32-256-ve"
         )
         model.load_state_dict(torch.load(ckp, map_location=args.device), strict=False)
     else:
         model = AutoModelForCausalLM.from_pretrained(args.load_from, trust_remote_code=True)
-        model.audio_encoder, model.audio_processor = MiniMindOmni.load_sensevoice("C:/dev/llm_exercise/minimind_model/SenseVoiceSmall")
-        model.vision_encoder, model.vision_processor = MiniMindOmni.load_vision("C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve")
+        model.audio_encoder, model.audio_processor = MiniMindOmni.load_sensevoice("../models/SenseVoiceSmall")
+        model.vision_encoder, model.vision_processor = MiniMindOmni.load_vision("../models/siglip2-base-p32-256-ve")
     log_model_params(model)
     if model.audio_encoder is not None: model.audio_encoder.to(args.device)
     if model.vision_encoder is not None: model.vision_encoder.to(args.device)
-    model.mimi_model = MimiModel.from_pretrained("C:/dev/llm_exercise/minimind_model/mimi").eval()
+    model.mimi_model = MimiModel.from_pretrained("../models/mimi").eval()
     return model.half().eval().to(args.device), tokenizer
 
 
@@ -65,12 +65,12 @@ def eval_sample(model, tokenizer, args, idx, prompt, audio_inputs, output_name, 
         print()
 
         if audio_frames:
-            print(f'🎹 [Talker]: {len(audio_frames)} frames', end=" ")
+            print(f'🎹 [Talker]: {len(audio_frames)} 프레임', end=" ")
             if args.decode_audio:
                 try:
                     codes = [f for f in audio_frames if f and len(f) == 8]
                     if not codes:
-                        print('⚠️  生成的Mimi codes为空，跳过保存。')
+                        print('⚠️  생성된 Mimi codes가 비어 있어 저장을 건너뜁니다.')
                         return
                     mimi_codes = torch.tensor(codes, dtype=torch.long).T.unsqueeze(0).to(args.device)
                     filtered = torch.where(mimi_codes >= 2049, torch.zeros_like(mimi_codes), mimi_codes)
@@ -80,32 +80,32 @@ def eval_sample(model, tokenizer, args, idx, prompt, audio_inputs, output_name, 
                     sf.write(wav_path, audio.squeeze().float().cpu().numpy(), 24000)
                     AudioSegment.from_wav(wav_path).export(output_path, format='mp3', bitrate='64k')
                     os.remove(wav_path)
-                    print(f'| Audio decoded to: {output_path}')
+                    print(f'| 오디오 디코딩 저장 위치: {output_path}')
                 except Exception as e:
-                    print(f'⚠️  保存音频失败: {str(e)}')
+                    print(f'⚠️  오디오 저장 실패: {str(e)}')
             else:
                 print("(decode_audio=off)\n")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="MiniMind-O Chat")
-    parser.add_argument('--load_from', default='C:/dev/llm_exercise/minimind_model', type=str, help="模型加载路径（model=原生torch权重）")
-    parser.add_argument('--save_dir', default='C:/dev/llm_exercise/minimind_out', type=str, help="模型权重目录")
-    parser.add_argument('--weight', default='sft_omni', type=str, help="权重名称前缀")
-    parser.add_argument('--hidden_size', default=768, type=int, help="隐藏层维度")
-    parser.add_argument('--num_hidden_layers', default=8, type=int, help="隐藏层数量")
-    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="是否使用MoE架构")
-    parser.add_argument('--max_new_tokens', default=512, type=int, help="最大生成长度")
-    parser.add_argument('--temperature', default=0.7, type=float, help="Thinker生成温度")
-    parser.add_argument('--top_p', default=0.85, type=float, help="nucleus采样阈值")
-    parser.add_argument('--output_dir', default='C:/dev/llm_exercise/minimind_out/output_audio/', type=str, help="输出音频保存目录")
-    parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', type=str, help="运行设备")
-    parser.add_argument('--audio_dir', default='C:/dev/llm_exercise/minimind_dataset/eval_omni/', type=str, help="测试音频目录")
-    parser.add_argument('--image_dir', default='C:/dev/llm_exercise/minimind_dataset/eval_omni/', type=str, help="测试图像目录")
-    parser.add_argument('--open_thinking', default=0, type=int, help="是否开启思考模式（0=否，1=是）（思考模式下禁用audio输出）")
-    parser.add_argument('--decode_audio', default=1, type=int, help="是否解码音频输出（0=否，1=是）")
-    parser.add_argument('--mode', default='0', type=str, help="评估模式：-1=all 0=text 1=multi 2=audio 3=clone 4=image 5=mix（逗号组合，如 2,5）")
-    parser.add_argument('--prompt_lang', default=0, type=int, choices=[0, 1, 2], help="问题语言：0=英文 1=中文 2=英文+中文")
+    parser = argparse.ArgumentParser(description="MiniMind-O 대화")
+    parser.add_argument('--load_from', default='../models', type=str, help="모델 로드 경로(model=네이티브 torch 가중치)")
+    parser.add_argument('--save_dir', default='../checkouts', type=str, help="모델 가중치 디렉터리")
+    parser.add_argument('--weight', default='sft_omni', type=str, help="가중치 이름 접두사")
+    parser.add_argument('--hidden_size', default=768, type=int, help="은닉층 차원")
+    parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 수")
+    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부")
+    parser.add_argument('--max_new_tokens', default=512, type=int, help="최대 생성 길이")
+    parser.add_argument('--temperature', default=0.7, type=float, help="Thinker 생성 온도")
+    parser.add_argument('--top_p', default=0.85, type=float, help="뉴클리어스 샘플링 임계값")
+    parser.add_argument('--output_dir', default='../checkouts/output_audio/', type=str, help="출력 오디오 저장 디렉터리")
+    parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', type=str, help="실행 장치")
+    parser.add_argument('--audio_dir', default='../datasets/eval_omni/', type=str, help="테스트 오디오 디렉터리")
+    parser.add_argument('--image_dir', default='../datasets/eval_omni/', type=str, help="테스트 이미지 디렉터리")
+    parser.add_argument('--open_thinking', default=0, type=int, help="thinking 모드 활성화 여부(0=아니오, 1=예, thinking 모드에서는 audio 출력 비활성화)")
+    parser.add_argument('--decode_audio', default=1, type=int, help="오디오 출력 디코딩 여부(0=아니오, 1=예)")
+    parser.add_argument('--mode', default='0', type=str, help="평가 모드: -1=전체 0=텍스트 1=멀티턴 2=오디오 3=음색 복제 4=이미지 5=혼합(쉼표 조합, 예: 2,5)")
+    parser.add_argument('--prompt_lang', default=0, type=int, choices=[0, 1, 2], help="질문 언어: 0=영어 1=중국어 2=영어+중국어")
     args = parser.parse_args()
     modes = set(args.mode.replace(',', '').replace('-1', '012345'))
     
@@ -114,14 +114,14 @@ def main():
     setup_seed(int(time.time()) % 31415926)
 
     if '0' in modes:
-        print('\n\n==================== text -> {text, audio} ====================')
+        print('\n\n==================== 텍스트 -> {텍스트, 오디오} ====================')
         test_prompts_en = [
-            "Tell me an interesting fact about space.", "How do I make a cup of coffee?", "What's the weather like today?",
-            "Will it rain tomorrow?", "Tell me a joke.", "Can you sing a song for me?", "Please introduce yourself."
+            "우주에 관한 흥미로운 사실을 알려 주세요.", "커피 한 잔을 어떻게 만들면 되나요?", "오늘 날씨는 어떤가요?",
+            "내일 비가 올까요?", "농담 하나 해 주세요.", "저를 위해 노래를 불러 줄 수 있나요?", "자기소개를 해 주세요."
         ]
         test_prompts_zh = [
-            "告诉我一个关于太空的有趣事实。", "如何制作一杯咖啡？", "今天的天气怎么样？",
-            "明天会下雨吗？", "给我讲个笑话吧", "你能为我唱首歌吗？", "介绍一下你自己"
+            "우주에 관한 흥미로운 사실을 알려 주세요.", "커피 한 잔을 어떻게 만들면 되나요?", "오늘 날씨는 어떤가요?",
+            "내일 비가 올까요?", "농담 하나 해 주세요.", "저를 위해 노래를 불러 줄 수 있나요?", "자기소개를 해 주세요."
         ]
         test_prompts = [test_prompts_en, test_prompts_zh, test_prompts_en + test_prompts_zh][args.prompt_lang]
         for idx, prompt in enumerate(test_prompts):
@@ -129,41 +129,41 @@ def main():
             eval_sample(model, tokenizer, args, idx, prompt, None, f"text-{idx:02d}.mp3")
 
     if '1' in modes:
-        print('\n\n==================== multi-turn -> {text, audio} ====================')
+        print('\n\n==================== 멀티턴 -> {텍스트, 오디오} ====================')
         multi_turn_tests_zh = [
             {
                 "history": [
-                    {"role": "user", "content": "你好"},
-                    {"role": "assistant", "content": "你好！有什么可以帮你的吗？"}
+                    {"role": "user", "content": "안녕하세요"},
+                    {"role": "assistant", "content": "안녕하세요! 무엇을 도와드릴까요?"}
                 ],
-                "prompt": "我想找点事做，你有什么建议吗？"
+                "prompt": "할 일을 찾고 있어요. 추천할 만한 것이 있나요?"
             },
             {
                 "history": [
-                    {"role": "user", "content": "你好"},
-                    {"role": "assistant", "content": "你好！有什么可以帮你的吗？"},
-                    {"role": "user", "content": "我想找点事做，你有什么建议吗？"},
-                    {"role": "assistant", "content": "可以听听音乐或者看看书，放松一下心情。"}
+                    {"role": "user", "content": "안녕하세요"},
+                    {"role": "assistant", "content": "안녕하세요! 무엇을 도와드릴까요?"},
+                    {"role": "user", "content": "할 일을 찾고 있어요. 추천할 만한 것이 있나요?"},
+                    {"role": "assistant", "content": "음악을 듣거나 책을 읽으면서 마음을 조금 쉬게 해 보세요."}
                 ],
-                "prompt": "好的，那我去照做了，谢谢你"
+                "prompt": "좋아요, 그렇게 해 볼게요. 고마워요."
             }
         ]
         multi_turn_tests_en = [
             {
                 "history": [
-                    {"role": "user", "content": "Hello"},
-                    {"role": "assistant", "content": "Hello! How can I help you?"}
+                    {"role": "user", "content": "안녕하세요"},
+                    {"role": "assistant", "content": "안녕하세요! How can I help you?"}
                 ],
-                "prompt": "I want to find something to do. Do you have any suggestions?"
+                "prompt": "할 일을 찾고 있어요. 추천할 만한 것이 있나요?"
             },
             {
                 "history": [
-                    {"role": "user", "content": "Hello"},
-                    {"role": "assistant", "content": "Hello! How can I help you?"},
-                    {"role": "user", "content": "I want to find something to do. Do you have any suggestions?"},
-                    {"role": "assistant", "content": "You can listen to music or read a book to relax a little."}
+                    {"role": "user", "content": "안녕하세요"},
+                    {"role": "assistant", "content": "안녕하세요! How can I help you?"},
+                    {"role": "user", "content": "할 일을 찾고 있어요. 추천할 만한 것이 있나요?"},
+                    {"role": "assistant", "content": "음악을 듣거나 책을 읽으면서 조금 쉬어 보세요."}
                 ],
-                "prompt": "Okay, I will try that. Thank you."
+                "prompt": "좋아요, 그렇게 해 볼게요. 고마워요."
             }
         ]
         multi_turn_tests = [multi_turn_tests_en, multi_turn_tests_zh, multi_turn_tests_en + multi_turn_tests_zh][args.prompt_lang]
@@ -174,7 +174,7 @@ def main():
             eval_sample(model, tokenizer, args, idx, test["prompt"], None, f"multi-{idx:02d}.mp3", history=test["history"])
 
     if '2' in modes:
-        print('\n\n==================== audio -> {text, audio} ====================')
+        print('\n\n==================== 오디오 -> {텍스트, 오디오} ====================')
         audio_files_en = sorted([f for f in os.listdir(args.audio_dir) if f.startswith('audio-en-') and f.lower().endswith(('.mp3', '.wav'))])
         audio_files_zh = sorted([f for f in os.listdir(args.audio_dir) if f.startswith('audio-zh-') and f.lower().endswith(('.mp3', '.wav'))])
         audio_files = [audio_files_en, audio_files_zh, audio_files_en + audio_files_zh][args.prompt_lang]
@@ -188,11 +188,11 @@ def main():
             eval_sample(model, tokenizer, args, idx, prompt, audio_inputs, f"audio-{idx:02d}-{os.path.splitext(audio_file)[0]}.mp3", audio_lens=audio_lens)
 
     if '3' in modes:
-        print('\n\n==================== clone voice -> {text, audio} ====================')
-        clone_prompts_en = ["Hello, please introduce yourself.", "What's the weather like today?", "Tell me a joke."]
-        clone_prompts_zh = ["你好，请介绍一下你自己。", "今天天气怎么样？", "给我讲个笑话吧。"]
+        print('\n\n==================== 음색 복제 -> {텍스트, 오디오} ====================')
+        clone_prompts_en = ["안녕하세요, 자기소개를 해 주세요.", "오늘 날씨는 어떤가요?", "농담 하나 해 주세요."]
+        clone_prompts_zh = ["안녕하세요, 자기소개를 해 주세요.", "오늘 날씨는 어떤가요?", "농담 하나 해 주세요."]
         clone_prompts = [clone_prompts_en, clone_prompts_zh, clone_prompts_en + clone_prompts_zh][args.prompt_lang]
-        voices_pt = 'C:/dev/llm_exercise/minimind_model/speaker/voices_unseen.pt'
+        voices_pt = '../models/speaker/voices_unseen.pt'
         voices = [('default', None, None)]
         if os.path.exists(voices_pt):
             voice_data = torch.load(voices_pt, map_location=args.device)
@@ -201,30 +201,30 @@ def main():
                 se = v['spk_emb'].half().unsqueeze(0).to(args.device) if 'spk_emb' in v else None
                 voices.append((speaker, rc, se))
         for speaker, rc, se in voices:
-            info = f'ref_codes: {rc.shape[2]} frames, spk_emb: {"+" if se is not None else "-"}' if rc is not None else ('spk_emb only' if se is not None else 'default')
+            info = f'ref_codes: {rc.shape[2]} 프레임, spk_emb: {"+" if se is not None else "-"}' if rc is not None else ('spk_emb only' if se is not None else 'default')
             print(f'\n🎵 [clone: {speaker}] {info}')
             for idx, prompt in enumerate(clone_prompts):
                 print(f'  📝 [text-{idx+1}]: {prompt}')
-                history = [{"role": "system", "content": "你是一个专业的语音助手，请用给定的音色风格来回答用户的问题。请尽量详细地回答，给出有价值的信息。"}]
+                history = [{"role": "system", "content": "당신은 전문 음성 어시스턴트입니다. 주어진 음색 스타일로 사용자의 질문에 답하세요. 가능한 자세하고 가치 있는 정보를 제공하세요."}]
                 eval_sample(model, tokenizer, args, idx, prompt, None, f"clone-{speaker}-{idx:02d}.mp3", ref_codes=rc, history=history, spk_emb=se)
 
     if '4' in modes:
-        print('\n\n==================== image -> {text, audio} ====================')
+        print('\n\n==================== 이미지 -> {텍스트, 오디오} ====================')
         image_files = sorted([f for f in os.listdir(args.image_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
         for idx, image_file in enumerate(image_files):
             print(f'\n🖼️ [image-{idx+1}]: {image_file}')
             image = Image.open(os.path.join(args.image_dir, image_file)).convert('RGB')
             pixel_values = {k: v.to(args.device) for k, v in model.vision_processor(images=image, return_tensors="pt").items()}
-            prompts = [["Please describe this image."], ["请描述这张图片"], ["Please describe this image.", "请描述这张图片"]][args.prompt_lang]
+            prompts = [["이 이미지를 설명해 주세요."], ["이 이미지를 설명해 주세요."], ["이 이미지를 설명해 주세요.", "이 이미지를 설명해 주세요."]][args.prompt_lang]
             for lang_idx, prompt_text in enumerate(prompts):
                 prompt = prompt_text + "\n\n" + model.config.image_special_token * model.config.image_token_len
                 eval_sample(model, tokenizer, args, idx, prompt, None, f"image-{idx:02d}-{lang_idx}-{os.path.splitext(image_file)[0]}.mp3", pixel_values=pixel_values)
 
     if '5' in modes:
-        print('\n\n==================== text+audio+image -> {text, audio} ====================')
+        print('\n\n==================== text+audio+이미지 -> {텍스트, 오디오} ====================')
         img_audio_files = sorted([f for f in os.listdir(args.audio_dir) if f.startswith('img-') and f.lower().endswith(('.mp3', '.wav'))])
         image_files = sorted([f for f in os.listdir(args.image_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
-        text_hints = [["Please answer me: "], ["请回答我："], ["Please answer me: ", "请回答我："]][args.prompt_lang]
+        text_hints = [["답변해 주세요: "], ["답변해 주세요: "], ["답변해 주세요: ", "답변해 주세요: "]][args.prompt_lang]
         for idx, image_file in enumerate(image_files):
             audio_file = random.choice(img_audio_files)
             image = Image.open(os.path.join(args.image_dir, image_file)).convert('RGB')

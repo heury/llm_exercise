@@ -180,8 +180,8 @@ def chat_loop(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind DLLM TUI Chat")
-    parser.add_argument('--load_from', default='../../minimind_model', type=str, help="토크나이저 경로")
-    parser.add_argument('--save_dir', default='../../minimind_out', type=str, help="가중치 디렉토리")
+    parser.add_argument('--load_from', default='../../models', type=str, help="토크나이저 경로")
+    parser.add_argument('--save_dir', default='../../checkouts', type=str, help="가중치 디렉토리")
     parser.add_argument('--weight', default='dllm', type=str, help="가중치 접두사")
     parser.add_argument('--hidden_size', default=768, type=int, help="은닉층 차원")
     parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 수")

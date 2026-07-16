@@ -43,7 +43,7 @@ def init_model(args):
             load_lora(model, f'{args.save_dir}/lora/{args.lora_weight}_{args.hidden_size}.pth')
     else:
         model = AutoModelForCausalLM.from_pretrained(args.load_from, trust_remote_code=True)
-    print(f'MiniMind模型参数量: {sum(p.numel() for p in model.parameters()) / 1e6:.2f} M(illion)')
+    print(f'MiniMind 모델 파라미터 수: {sum(p.numel() for p in model.parameters()) / 1e6:.2f} M(illion)')
     return model.half().eval().to(device), tokenizer
 
 
@@ -59,7 +59,7 @@ class ChatRequest(BaseModel):
     chat_template_kwargs: dict = None
     
     def get_open_thinking(self) -> bool:
-        """兼容多种方式开启 thinking"""
+        """여러 방식으로 thinking 활성화 지원"""
         if self.open_thinking:
             return True
         if self.chat_template_kwargs:
@@ -235,17 +235,17 @@ async def chat_completions(request: ChatRequest):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Server for MiniMind")
-    parser.add_argument('--load_from', default='C:/dev/llm_exercise/minimind_model', type=str, help="模型加载路径（model=原生torch权重，其他路径=transformers格式）")
-    parser.add_argument('--save_dir', default='C:/dev/llm_exercise/minimind_out', type=str, help="模型权重目录")
-    parser.add_argument('--weight', default='full_sft', type=str, help="权重名称前缀（pretrain, full_sft, dpo, reason, ppo_actor, grpo, spo）")
-    parser.add_argument('--lora_weight', default='None', type=str, help="LoRA权重名称（None表示不使用，可选：lora_identity, lora_medical）")
-    parser.add_argument('--hidden_size', default=768, type=int, help="隐藏层维度")
-    parser.add_argument('--num_hidden_layers', default=8, type=int, help="隐藏层数量")
-    parser.add_argument('--max_seq_len', default=8192, type=int, help="最大序列长度")
-    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="是否使用MoE架构（0=否，1=是）")
-    parser.add_argument('--inference_rope_scaling', default=False, action='store_true', help="启用RoPE位置编码外推（4倍，仅解决位置编码问题）")
-    parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', type=str, help="运行设备")
+    parser = argparse.ArgumentParser(description="MiniMind 서버")
+    parser.add_argument('--load_from', default='../../models', type=str, help="모델 로드 경로(model=네이티브 torch 가중치, 다른 경로=transformers 형식)")
+    parser.add_argument('--save_dir', default='../../checkouts', type=str, help="모델 가중치 디렉터리")
+    parser.add_argument('--weight', default='full_sft', type=str, help="가중치 이름 접두사（pretrain, full_sft, dpo, reason, ppo_actor, grpo, spo）")
+    parser.add_argument('--lora_weight', default='None', type=str, help="LoRA 가중치 이름(None이면 사용하지 않음, 선택: lora_identity, lora_medical)")
+    parser.add_argument('--hidden_size', default=768, type=int, help="은닉층 차원")
+    parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 수")
+    parser.add_argument('--max_seq_len', default=8192, type=int, help="최대 시퀀스 길이")
+    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부(0=아니오, 1=예)")
+    parser.add_argument('--inference_rope_scaling', default=False, action='store_true', help="RoPE 위치 인코딩 외삽 활성화(4배, 위치 인코딩 문제만 해결)")
+    parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', type=str, help="실행 장치")
     args = parser.parse_args()
     device = args.device
     model, tokenizer = init_model(args)

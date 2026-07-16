@@ -27,7 +27,7 @@ REF_FRAMES = 300
 CLONE_VOICE = 'voice_clone'
 CLONE_FILE = 'voice_clone.pt'
 
-# -------- helpers --------
+# -------- 헬퍼 --------
 def sse(d): return f"data: {json.dumps(d)}\n\n"
 
 def scan_hf_models(base_dir):
@@ -83,7 +83,7 @@ def pcm_bytes(frames, ov):
     return (au * 32767).astype('int16').tobytes()
 
 def stream_pcm(frames, flush=False):
-    """yield (pcm_bytes,) on chunk boundaries or on final flush."""
+    """chunk 경계 또는 마지막 flush 시 (pcm_bytes,)를 yield합니다."""
     if not M['mimi']: return
     cf, ov_max, n = M['cfg'].audio_chunk_frames, M['cfg'].audio_overlap, len(frames)
     if not flush and n >= cf and n % cf == 0:
@@ -117,11 +117,11 @@ def register_voice(name, value, group='manual'):
             lst.remove(name)
 
 def clone_voice_path():
-    return os.path.join('C:/dev/llm_exercise/minimind_model/speaker', CLONE_FILE)
+    return os.path.join('../../models/speaker', CLONE_FILE)
 
 def delete_manual_voice(name):
     if name not in V_manual:
-        raise RuntimeError('只能删除手动克隆的音色')
+        raise RuntimeError('수동으로 복제한 음색만 삭제할 수 있습니다')
     out_path = clone_voice_path()
     saved = torch.load(out_path, map_location='cpu') if os.path.exists(out_path) else {}
     if name in saved:
@@ -136,16 +136,16 @@ def normalize_voice_name(name):
     if not name:
         name = CLONE_VOICE
     if len(name) > 24:
-        raise RuntimeError('音色名太长，建议控制在 24 个字以内')
+        raise RuntimeError('음색 이름이 너무 깁니다. 24자 이내를 권장합니다')
     if name.lower() == 'default':
-        raise RuntimeError('default 是保留名称，请换一个')
+        raise RuntimeError('default는 예약된 이름입니다. 다른 이름을 사용하세요')
     if name in V_builtin or name in V_unseen:
-        raise RuntimeError('该名称已被现有音色占用，请换一个')
+        raise RuntimeError('이미 사용 중인 음색 이름입니다. 다른 이름을 사용하세요')
     return name
 
 def validate_clone_audio(w16):
     if w16.numel() < int(16000 * 1.8):
-        raise RuntimeError('录音太短，请把整句话读完')
+        raise RuntimeError('녹음이 너무 짧습니다. 문장을 끝까지 읽어 주세요')
     peak = w16.abs().max().item()
     frame, hop = 800, 400
     if w16.numel() >= frame:
@@ -155,18 +155,18 @@ def validate_clone_audio(w16):
     hi = float(np.quantile(rms, 0.95))
     lo = float(np.quantile(rms, 0.2))
     if hi < 0.008:
-        raise RuntimeError('录音太轻，请靠近麦克风一点')
+        raise RuntimeError('녹음 소리가 너무 작습니다. 마이크에 조금 더 가까이 가 주세요')
     if hi > 0 and lo / hi > 0.45:
-        raise RuntimeError('环境噪声太大，请换安静一点的环境')
+        raise RuntimeError('주변 소음이 너무 큽니다. 더 조용한 환경에서 시도해 주세요')
     if peak > 0.995:
-        raise RuntimeError('录音有爆音，请离麦克风远一点')
+        raise RuntimeError('녹음에 클리핑이 있습니다. 마이크에서 조금 떨어져 주세요')
 
 def build_clone_voice(audio_b64):
     if M.get('mimi') is None or M.get('campplus') is None or M.get('mel_fn') is None:
-        raise RuntimeError('Mimi 或 CAM++ 未加载')
+        raise RuntimeError('Mimi 또는 CAM++가 로드되지 않았습니다')
     seg = AudioSegment.from_file(io.BytesIO(base64.b64decode(audio_b64))).set_channels(1).set_sample_width(2)
     if len(seg) < 1000:
-        raise RuntimeError('录音太短，至少读 1 秒')
+        raise RuntimeError('녹음이 너무 짧습니다. 최소 1초 이상 읽어 주세요')
     try:
         seg = seg.speedup(playback_speed=1.5, chunk_size=150, crossfade=25)
     except Exception:
@@ -203,8 +203,8 @@ def load_main_model(model_path, model_name):
         if torch.cuda.is_available(): torch.cuda.empty_cache()
         tok = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         m = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
-        vision_encoder, vision_processor = MiniMindOmni.load_vision('C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve')
-        audio_encoder, audio_processor = MiniMindOmni.load_sensevoice('C:/dev/llm_exercise/minimind_model/SenseVoiceSmall')
+        vision_encoder, vision_processor = MiniMindOmni.load_vision('../../models/siglip2-base-p32-256-ve')
+        audio_encoder, audio_processor = MiniMindOmni.load_sensevoice('../../models/SenseVoiceSmall')
         object.__setattr__(m, 'vision_encoder', vision_encoder)
         object.__setattr__(m, 'vision_processor', vision_processor)
         object.__setattr__(m, 'audio_encoder', audio_encoder)
@@ -214,11 +214,11 @@ def load_main_model(model_path, model_name):
         if m.vision_encoder: m.vision_encoder.to(M['device'])
         M['tokenizer'], M['model'], M['model_name'] = tok, m, model_name
         params = sum(p.numel() for p in m.parameters()) / 1e6
-        print(f'Loaded model: {model_name} ({params:.2f}M)')
+        print(f'모델 로드됨: {model_name} ({params:.2f}M)')
         return round(params, 2)
 
 def prepare_turn(text, samples, image_b64, do_asr_for_image):
-    """返回 (audio_inputs, audio_lens, pixel_values, prompt_for_model, user_text_for_history, asr_thread, asr_result)"""
+    """(audio_inputs, audio_lens, pixel_values, prompt_for_model, user_text_for_history, asr_thread, asr_result)를 반환"""
     audio_inputs = audio_lens = pixel_values = None
     prompt = text or ''
     user_text = text or ''
@@ -236,10 +236,10 @@ def prepare_turn(text, samples, image_b64, do_asr_for_image):
     if image_b64:
         pixel_values = prep_image(image_b64)
         m = M['model']
-        prompt = (prompt + "\n\n" if prompt else "") + "请描述这张图片\n\n" + m.config.image_special_token * m.config.image_token_len
+        prompt = (prompt + "\n\n" if prompt else "") + "이 이미지를 설명해 주세요.\n\n" + m.config.image_special_token * m.config.image_token_len
     return audio_inputs, audio_lens, pixel_values, prompt, user_text, asr_thread, asr_result
 
-# -------- routes --------
+# -------- 라우트 --------
 @app.route('/')
 def index(): return send_from_directory('.', 'web_demo.html')
 @app.route('/call')
@@ -277,7 +277,7 @@ def clone_voice():
         saved[name] = value
         torch.save(saved, out_path)
         register_voice(name, value, group='manual')
-        return Response(json.dumps({'ok': True, 'voice': name, 'path': 'C:/dev/llm_exercise/minimind_model/speaker/' + CLONE_FILE}), mimetype='application/json')
+        return Response(json.dumps({'ok': True, 'voice': name, 'path': '../../models/speaker/' + CLONE_FILE}), mimetype='application/json')
     except Exception as e:
         return Response(json.dumps({'ok': False, 'error': str(e)}), status=500, mimetype='application/json')
 
@@ -443,35 +443,35 @@ def realtime(ws):
 def init_model(args):
     M['cfg'] = args; M['device'] = args.device
     with contextlib.redirect_stdout(io.StringIO()):
-        M['asr'] = AutoModel(model='C:/dev/llm_exercise/minimind_model/SenseVoiceSmall', trust_remote_code=True, device=args.device, disable_update=True)
+        M['asr'] = AutoModel(model='../../models/SenseVoiceSmall', trust_remote_code=True, device=args.device, disable_update=True)
     M['models'] = scan_hf_models(args.load_from)
     if not M['models']:
-        raise RuntimeError(f"未在 {os.path.abspath(args.load_from)} 找到 transformers 模型")
+        raise RuntimeError(f"다음 경로에서 {os.path.abspath(args.load_from)} transformers 모델을 찾지 못했습니다")
     model_name = next(iter(M['models']))
     load_main_model(M['models'][model_name], model_name)
     try:
         from transformers import MimiModel
-        M['mimi'] = MimiModel.from_pretrained('C:/dev/llm_exercise/minimind_model/mimi').eval().to(args.device)
+        M['mimi'] = MimiModel.from_pretrained('../../models/mimi').eval().to(args.device)
         if args.device != 'cpu': M['mimi'] = M['mimi'].half()
-        print('Mimi model loaded')
+        print('Mimi 모델 로드됨')
     except: M['mimi'] = None
     try:
         from modelscope.models.audio.sv.DTDNN import CAMPPlus
         M['campplus'] = CAMPPlus(feat_dim=80, embedding_size=192, growth_rate=32, bn_size=4,
                                  init_channels=128, config_str='batchnorm-relu', memory_efficient=True)
-        sd = torch.load('C:/dev/llm_exercise/minimind_model/campplus/campplus_cn_common.pt', map_location='cpu')
+        sd = torch.load('../../models/campplus/campplus_cn_common.pt', map_location='cpu')
         M['campplus'].load_state_dict({k: v.float() for k, v in sd.items()})
         M['campplus'] = M['campplus'].eval().to(args.device)
         M['mel_fn'] = torchaudio.transforms.MelSpectrogram(
             sample_rate=16000, n_fft=512, win_length=400, hop_length=160,
             n_mels=80, f_min=20, f_max=7600, norm='slaney', mel_scale='slaney',
         ).to(args.device)
-        print('CAM++ loaded')
+        print('CAM++ 로드됨')
     except Exception as e:
         M['campplus'], M['mel_fn'] = None, None
-        print(f'CAM++ load failed: {e}')
-    M['vad_path'] = 'C:/dev/llm_exercise/minimind_model/vad/silero_vad.onnx'
-    spk_dir = 'C:/dev/llm_exercise/minimind_model/speaker'
+        print(f'CAM++ 로드 실패: {e}')
+    M['vad_path'] = '../../models/vad/silero_vad.onnx'
+    spk_dir = '../../models/speaker'
     for fn, group in [('voices.pt', 'builtin'), ('voices_unseen.pt', 'unseen'), (CLONE_FILE, 'manual')]:
         fp = os.path.join(spk_dir, fn)
         if os.path.exists(fp):
@@ -480,24 +480,24 @@ def init_model(args):
                     register_voice(speaker, v, group=group)
     if V: print(f'Loaded {len(V)} voices: builtin={sorted(V_builtin)}, unseen={sorted(V_unseen)}, manual={sorted(V_manual)}')
     log_model_params(M['model'])
-    print('Warmup...')
+    print('워밍업...')
     with torch.no_grad():
         ids = torch.tensor([[1, 2, 3]], device=args.device)
         au = torch.full((1, 8, 3), 2049, dtype=torch.long, device=args.device)
         M['model'].forward(torch.cat((au, ids.unsqueeze(1)), dim=1))
         if M['model'].audio_encoder: M['model'].audio_encoder(torch.zeros(1, 100, 560, device=args.device), torch.tensor([100], device=args.device))
         if M['mimi']: M['mimi'].decode(torch.zeros(1, 8, 1, dtype=torch.long, device=args.device))
-    print('Warmup done!')
+    print('워밍업 완료!')
 
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
-    p.add_argument('--load_from', default='C:/dev/llm_exercise/minimind_model', help='模型权重搜索目录；目录下可放多个 HF 格式模型，WebUI 会自动扫描并允许切换。')
-    p.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', help='推理设备；CUDA 可用时默认 cuda。显存不足或排查环境问题时可改为 cpu。')
-    p.add_argument('--port', default=7860, type=int, help='WebUI 服务端口；端口被占用或需要同时启动多个实例时调整。')
-    p.add_argument('--audio_chunk_frames', default=4, type=int, help='流式播放每次解码的 Mimi frame 数；默认 4 约 320ms。WebUI 播放卡顿时可调大到 8/12，低延迟优先时保持 4。')
-    p.add_argument('--audio_overlap', default=2, type=int, help='分块 Mimi 解码的重叠帧数；默认 2 用于缓解块边界断裂。一般不需要调整，边界杂音明显时可适当增大。')
-    p.add_argument('--max_history_turns', default=0, type=int, help='对话历史轮数；默认 0 不带历史以降低延迟和显存。需要多轮上下文时调大，但会增加 prefill 成本。')
+    p.add_argument('--load_from', default='../../models', help='모델 가중치 검색 디렉터리; 디렉터리에 여러 HF 형식 모델을 둘 수 있으며 WebUI가 자동 스캔해 전환을 허용합니다.')
+    p.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', help='추론 장치; CUDA가 가능하면 기본값은 cuda입니다. VRAM 부족이나 환경 문제 점검 시 cpu로 바꿀 수 있습니다.')
+    p.add_argument('--port', default=7860, type=int, help='WebUI 서비스 포트; 포트가 사용 중이거나 여러 인스턴스를 동시에 시작해야 할 때 조정합니다.')
+    p.add_argument('--audio_chunk_frames', default=4, type=int, help='스트리밍 재생에서 한 번에 디코딩할 Mimi frame 수; 기본 4는 약 320ms입니다. WebUI 재생이 끊기면 8/12로 키우고, 낮은 지연이 우선이면 4를 유지하세요.')
+    p.add_argument('--audio_overlap', default=2, type=int, help='분할 Mimi 디코딩의 겹침 프레임 수; 기본 2는 블록 경계 단절을 완화합니다. 보통 조정할 필요는 없고 경계 잡음이 뚜렷하면 적절히 늘리세요.')
+    p.add_argument('--max_history_turns', default=0, type=int, help='대화 이력 턴 수; 기본 0은 이력을 쓰지 않아 지연과 VRAM을 줄입니다. 멀티턴 문맥이 필요하면 키우되 prefill 비용이 증가합니다.')
     args = p.parse_args()
     init_model(args)
     app.run(host='0.0.0.0', port=args.port, threaded=True)

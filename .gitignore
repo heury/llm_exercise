@@ -11,9 +11,9 @@ wheels/
 .venv
 
 # Large local datasets and generated artifacts
-minimind_dataset/
-minimind_model/
-minimind_out/
+checkouts/
+models/
+dataset/
 
 # Backups of nested repository metadata after vendoring subdirectories
 .nested-git-backups/

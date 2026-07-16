@@ -17,13 +17,13 @@ def init_model(args):
         ckp = f'{args.save_dir}/{args.weight}_{args.hidden_size}{moe_suffix}.pth'
         model = MiniMindVLM(
             VLMConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers, use_moe=bool(args.use_moe)),
-            vision_model_path="C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve"
+            vision_model_path="../models/siglip2-base-p32-256-ve"
         )
         state_dict = torch.load(ckp, map_location=args.device)
         model.load_state_dict({k: v for k, v in state_dict.items() if 'mask' not in k}, strict=False)
     else:
         model = AutoModelForCausalLM.from_pretrained(args.load_from, trust_remote_code=True)
-        model.vision_encoder, model.processor = MiniMindVLM.get_vision_model("C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve")
+        model.vision_encoder, model.processor = MiniMindVLM.get_vision_model("../models/siglip2-base-p32-256-ve")
     get_model_params(model, model.config)
     model = model.eval()
     if "cuda" in args.device: model = model.half()
@@ -31,27 +31,27 @@ def init_model(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="MiniMind-V Chat")
-    parser.add_argument('--load_from', default='C:/dev/llm_exercise/minimind_model', type=str, help="模型加载路径（model=原生torch权重，其他路径=transformers格式）")
-    parser.add_argument('--save_dir', default='C:/dev/llm_exercise/minimind_out', type=str, help="模型权重目录")
-    parser.add_argument('--weight', default='sft_vlm', type=str, help="权重名称前缀（pretrain_vlm, sft_vlm）")
-    parser.add_argument('--hidden_size', default=768, type=int, help="隐藏层维度")
-    parser.add_argument('--num_hidden_layers', default=8, type=int, help="隐藏层数量")
-    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="是否使用MoE架构（0=否，1=是）")
-    parser.add_argument('--max_new_tokens', default=512, type=int, help="最大生成长度")
-    parser.add_argument('--temperature', default=0.7, type=float, help="生成温度，控制随机性（0-1，越大越随机）")
-    parser.add_argument('--top_p', default=0.85, type=float, help="nucleus采样阈值（0-1）")
-    parser.add_argument('--image_dir', default='C:/dev/llm_exercise/minimind_dataset/eval_images/', type=str, help="测试图像目录")
-    parser.add_argument('--show_speed', default=1, type=int, help="显示decode速度（tokens/s）")
-    parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', type=str, help="运行设备")
-    parser.add_argument('--open_thinking', default=0, type=int, help="是否开启自适应思考（0=否，1=是）")
+    parser = argparse.ArgumentParser(description="MiniMind-V 대화")
+    parser.add_argument('--load_from', default='../models', type=str, help="모델 로드 경로(model=네이티브 torch 가중치, 다른 경로=transformers 형식)")
+    parser.add_argument('--save_dir', default='../checkouts', type=str, help="모델 가중치 디렉터리")
+    parser.add_argument('--weight', default='sft_vlm', type=str, help="가중치 이름 접두사(pretrain_vlm, sft_vlm)")
+    parser.add_argument('--hidden_size', default=768, type=int, help="은닉층 차원")
+    parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 수")
+    parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부(0=아니오, 1=예)")
+    parser.add_argument('--max_new_tokens', default=512, type=int, help="최대 생성 길이")
+    parser.add_argument('--temperature', default=0.7, type=float, help="생성 온도. 무작위성을 제어합니다(0~1, 클수록 더 무작위)")
+    parser.add_argument('--top_p', default=0.85, type=float, help="뉴클리어스 샘플링 임계값(0~1)")
+    parser.add_argument('--image_dir', default='../datasets/eval_images/', type=str, help="테스트 이미지 디렉터리")
+    parser.add_argument('--show_speed', default=1, type=int, help="디코딩 속도 표시(tokens/s)")
+    parser.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu', type=str, help="실행 장치")
+    parser.add_argument('--open_thinking', default=0, type=int, help="적응형 thinking 활성화 여부(0=아니오, 1=예)")
     args = parser.parse_args()
     
     model, tokenizer, preprocess = init_model(args)
     streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
-    # 自动测试image_dir中的所有图像
-    prompt = "<image>\n请描述这张图中的主要物体和场景。"
-    # prompt = "<image>\nPlease illustrate the image through your words."
+    # image_dir의 모든 이미지를 자동 테스트
+    prompt = "<image>\n이 이미지의 주요 물체와 장면을 설명해 주세요."
+    # prompt = "<image>\n이미지를 말로 설명해 주세요."
     for image_file in sorted(os.listdir(args.image_dir)):
         if image_file.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
             setup_seed(random.randint(1, 31415926))
@@ -63,7 +63,7 @@ def main():
             inputs_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, open_thinking=bool(args.open_thinking))
             inputs = tokenizer(inputs_text, return_tensors="pt", truncation=True).to(args.device)
             
-            print(f'[图像]: {image_file}')
+            print(f'[이미지]: {image_file}')
             print(f"💬: {repr(prompt)}")
             print('🤖: ', end='')
             st = time.time()
@@ -74,7 +74,7 @@ def main():
                 top_p=args.top_p, temperature=args.temperature, pixel_values=pixel_values
             )
             gen_tokens = len(generated_ids[0]) - len(inputs["input_ids"][0])
-            print(f'\n[Speed]: {gen_tokens / (time.time() - st):.2f} tokens/s\n\n') if args.show_speed else print('\n\n')
+            print(f'\n[속도]: {gen_tokens / (time.time() - st):.2f} tokens/s\n\n') if args.show_speed else print('\n\n')
 
 if __name__ == "__main__":
     main()

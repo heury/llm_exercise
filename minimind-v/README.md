@@ -160,10 +160,10 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ### 2' 下载资源
 
 ```bash
-# 下载 SigLIP2 视觉编码器到 ./model/siglip2-base-p32-256-ve
-modelscope download --model gongjy/siglip2-base-p32-256-ve --local_dir ./model/siglip2-base-p32-256-ve
-# 下载 MiniMind 语言模型权重到 ./out 目录下（作为训练 VLM 的基座语言模型）
-modelscope download --model gongjy/minimind-3v-pytorch llm_768.pth --local_dir ./out
+# 下载 SigLIP2 视觉编码器到 ./models/siglip2-base-p32-256-ve
+modelscope download --model gongjy/siglip2-base-p32-256-ve --local_dir ./models/siglip2-base-p32-256-ve
+# 下载 MiniMind 语言模型权重到 ./checkouts 目录下（作为训练 VLM 的基座语言模型）
+modelscope download --model gongjy/minimind-3v-pytorch llm_768.pth --local_dir ./checkouts
 ```
 
 注：也可从 [ModelScope Collection](https://modelscope.cn/collections/gongjy/MiniMind-V) 或 [HuggingFace Collection](https://huggingface.co/collections/jingyaogong/minimind-v-67000833fb60b3a2e1f3597d) 选择对应内容 `git clone`（需 LFS）下载，此处不再赘述。
@@ -172,10 +172,10 @@ modelscope download --model gongjy/minimind-3v-pytorch llm_768.pth --local_dir .
 
 ```text
 minimind-v/
-├── model/
+├── models/
 │   ├── siglip2-base-p32-256-ve/
 │   └── ...
-├── out/
+├── checkouts/
 │   └── llm_768.pth
 └── ...
 ```
@@ -185,8 +185,8 @@ minimind-v/
 ### 1' 下载发布权重
 
 ```bash
-# 下载发布权重到 ./out 目录下
-modelscope download --model gongjy/minimind-3v-pytorch --local_dir ./out
+# 下载发布权重到 ./checkouts 目录下
+modelscope download --model gongjy/minimind-3v-pytorch --local_dir ./checkouts
 ```
 
 ### 2' 命令行问答
@@ -227,18 +227,18 @@ print(torch.cuda.is_available())
 
 ### 1' 下载数据
 
-快速开始时，直接从[数据集链接](https://huggingface.co/datasets/jingyaogong/minimind-v_dataset)下载 `sft_i2t.parquet`，并放到 `./dataset` 下即可。
+快速开始时，直接从[数据集链接](https://huggingface.co/datasets/jingyaogong/minimind-v_dataset)下载 `sft_i2t.parquet`，并放到 `./datas` 下即可。
 
 <details style="color:rgb(128,128,128)">
 <summary>注：数据集须知</summary>
 
 【注1】之前需解压50万零碎的图像文件可能非常慢。2025-12-27起，数据集格式统一为 Parquet，图文一体化存储，体积更小，无需解压，加载更快。
 
-【注2】Parquet 是列式存储格式，支持高效压缩和快速读取。如果你对它感到陌生，可以预览数据内容，在 `dataset/` 目录下执行 `python lm_dataset.py` 可视化前5条图文对。
+【注2】Parquet 是列式存储格式，支持高效压缩和快速读取。如果你对它感到陌生，可以预览数据内容，在 `datas/` 目录下执行 `python lm_dataset.py` 可视化前5条图文对。
 
 Pretrain 数据（可选；仅包含 caption 子集）：
 ```bash
-wget https://hf-mirror.com/datasets/jingyaogong/minimind-v_dataset/resolve/main/pretrain_i2t.parquet -P ./dataset
+wget https://hf-mirror.com/datasets/jingyaogong/minimind-v_datas/resolve/main/pretrain_i2t.parquet -P ./datas
 ```
 
 SFT 单文件 290 万条已把 Pretrain 作为子集合并，经全局 dictionary encoding 去重后体积只比 SFT 原版多 ~10%，可覆盖所有训练阶段。因此快速复现时可以跳过 Pretrain，直接进入 SFT。
@@ -260,7 +260,7 @@ python train_pretrain_vlm.py --epochs 2 --from_weight llm
 python train_sft_vlm.py --epochs 2 --from_weight pretrain_vlm
 ```
 
-执行完成后，`out/` 下会生成 `sft_vlm_*.pth` 作为 SFT 权重。
+执行完成后，`checkouts/` 下会生成 `sft_vlm_*.pth` 作为 SFT 权重。
 
 <details style="color:rgb(128,128,128)">
 <summary>注：训练须知</summary>
@@ -268,7 +268,7 @@ python train_sft_vlm.py --epochs 2 --from_weight pretrain_vlm
 - 支持断点续训：添加`--from_resume 1`参数可从上次中断处继续训练
 - 支持GPU数量变化：续训时GPU数量改变会自动转换step
 - 原子性保存：使用临时文件+替换机制，防止保存过程中断导致权重损坏
-- 每次保存同时生成`out/**.pth`（模型权重）和`checkpoints/**_resume.pth`（训练状态）文件
+- 每次保存同时生成`checkouts/**.pth`（模型权重）和`checkouts/**_resume.pth`（训练状态）文件
 
 ```bash
 # 训练中断后，使用相同命令并添加 --from_resume 1
@@ -286,7 +286,7 @@ python train_sft_vlm.py --epochs 4 --from_resume 1
 
 ### 3' 测试已训练模型（可选）
 
-确保需要测试的模型 `*.pth` 文件位于 `./out/` 目录下。
+确保需要测试的模型 `*.pth` 文件位于 `./checkouts/` 目录下。
 也可以直接去[此处](https://huggingface.co/jingyaogong/minimind-3v-pytorch)下载使用我训练的`*.pth`文件。
 
 ```bash
@@ -542,7 +542,7 @@ Prompt: `<image>\n请描述这张图中的主要物体和场景。`
   <tbody>
     <tr>
       <td>
-        <img src="./dataset/eval_images/image-01-golden-dog-balloons.jpg" alt="golden-dog">
+        <img src="./datas/eval_images/image-01-golden-dog-balloons.jpg" alt="golden-dog">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       </td>
       <td>这张图中的主要物体是一只金毛寻回犬，以其金色的外套和友好的表情而闻名。金毛寻回犬以活泼的表情和友好而闻名，它们正在进行充满活力和活跃的互动。它的姿势和表情传达了一种快乐和积极的情绪。这只金毛寻回犬被描述为一个活泼的、充满活力的、充满活力的狗，在阳光明媚的户外环境中展现出来。它的眼睛是友好的，嘴巴是闭着的，这表明它在享受阳光明媚的日子里感到快乐和满足。在背景中，可以看到一片草地和晴朗的天空，暗示着这是一个宁静的户外环境。背景中的天空是淡蓝色的，有几朵零星的云，暗示着一个晴朗的日子。总体而言，这只金毛寻回犬的外表和活动充满了快乐和积极的情绪，使其成为一个充满活力和快乐的快乐时刻。</td>
@@ -550,7 +550,7 @@ Prompt: `<image>\n请描述这张图中的主要物体和场景。`
     </tr>
     <tr>
       <td>
-        <img src="./dataset/eval_images/image-02-rainbow-umbrella-street.jpg" alt="rainbow-umbrella">
+        <img src="./datas/eval_images/image-02-rainbow-umbrella-street.jpg" alt="rainbow-umbrella">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       </td>
       <td>这张图中的主要物体是一把雨伞，根据其颜色和光泽，它是雨伞的特征之一。雨伞设计用于防止雨水进入，同时保持其透明度和可见性。它主要是绿色、红色、黄色和蓝色，还有一些白色的装饰，这在雨伞的背景下很常见。雨伞的反射和光线暗示着它可能是在一个有阳光的户外环境中拍摄的。雨伞是雨水的典型特征，表明它可能是雨天或湿润的天气条件。</td>
@@ -558,7 +558,7 @@ Prompt: `<image>\n请描述这张图中的主要物体和场景。`
     </tr>
     <tr>
       <td>
-        <img src="./dataset/eval_images/image-03-cherry-blossom-bike.jpg" alt="cherry-blossom-bike">
+        <img src="./datas/eval_images/image-03-cherry-blossom-bike.jpg" alt="cherry-blossom-bike">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       </td>
       <td>这张图中的主要物体是一辆自行车，具体来说是一辆青绿色的自行车。这辆自行车是图片的中心焦点，展示了它的设计和特点。自行车的座椅是鲜艳的蓝色，带有白色座椅，座椅和座椅上点缀着粉色花朵，与青绿色的背景形成鲜明对比。自行车的前部配有黑色轮胎，胎部和车轮上还有小的装饰，可能是为了增加了视觉吸引力。背景中可见一片水域，可能是湖泊或河流，这表明照片是在一个宁静的自然环境中拍摄的，很可能是在一个水域旁边，因为远处可以看到一条蜿蜒的河流。天空阴沉，光线柔和，没有明显的阴影，这表明照片是在太阳处于较低角度的时候拍摄的。</td>
@@ -566,7 +566,7 @@ Prompt: `<image>\n请描述这张图中的主要物体和场景。`
     </tr>
     <tr>
       <td>
-        <img src="./dataset/eval_images/image-04-yellow-car.jpg" alt="yellow-car">
+        <img src="./datas/eval_images/image-04-yellow-car.jpg" alt="yellow-car">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       </td>
       <td>这张图中的主要物体是一辆现代高性能跑车。它以醒目的黄色为主色调，配有黑色轮毂和银色合金轮毂。车身设计时尚，前保险杠设计时尚，配有流线型的后扰流板，并配备了高性能轮胎。车轮是黑色的，带有明显的辐条，与黄色车身形成鲜明对比。背景中是晴朗的蓝天，偶尔有几朵零星的云，暗示着一个宁静的时刻。天空大部分晴朗，偶尔有几朵云，表明天气条件良好。没有可见的品牌标志或标识，使图片显得独特而不受欢迎。</td>
@@ -574,7 +574,7 @@ Prompt: `<image>\n请描述这张图中的主要物体和场景。`
     </tr>
     <tr>
       <td>
-        <img src="./dataset/eval_images/image-05-superhero-rooftop.jpg" alt="superhero">
+        <img src="./datas/eval_images/image-05-superhero-rooftop.jpg" alt="superhero">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       </td>
       <td>这张图中的主要物体是一位超级英雄的个人，被描绘在黄金时刻，这可以从他的姿势和服装上看出。超级英雄以超人般的姿势站立，一条腿抬起，脚踩在空中，另一条腿弯曲，仿佛在进行着一场致命的战斗。他的服装是蓝色的，带有红色的装饰，暗示着一种奔跑的姿态。他的头发是黑色的，右手拿着一个类似超级英雄的标志，左手拿着一个红色的锁。背景是一片模糊的天空，有云彩和远处的城市景观，暗示着一个城市环境。天空被从顶部的深蓝色渐变到地平线附近的暖色调，增强了日落的色彩。</td>
@@ -582,7 +582,7 @@ Prompt: `<image>\n请描述这张图中的主要物体和场景。`
     </tr>
     <tr>
       <td>
-        <img src="./dataset/eval_images/image-06-racecar-drift.jpg" alt="racecar">
+        <img src="./datas/eval_images/image-06-racecar-drift.jpg" alt="racecar">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       </td>
       <td>这张图中的主要物体是一辆现代的赛车，具体来说是赛车。赛车是赛车运动的典型特征，具有高速、长长的后扰流板、高翼配置和独特的尾灯设计。赛车设计用于高速操控和高速操控，在赛道上形成一道弧线，增加了赛车的动感。赛车配备了空气动力学和空气动力学，这些特点在赛道上可见，表明这辆车可能是一辆高性能赛车。背景中可以看到赛车和观众，表明这辆赛车是高性能赛车的典型，而赛车的细节和风格表明这是一辆高性能赛车。赛车和车手身上没有可见的个人物品，使其成为图片的焦点。</td>

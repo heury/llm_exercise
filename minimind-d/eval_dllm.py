@@ -28,8 +28,8 @@ def init_model(args):
 # 기능: main 함수에서 필요한 데이터 변환과 모델 호출 로직을 수행합니다.
 def main():
     parser = argparse.ArgumentParser(description="MiniMind DLLM Inference")
-    parser.add_argument('--load_from', default='../minimind_model', type=str, help="모델 로드 경로")
-    parser.add_argument('--save_dir', default='../minimind_out', type=str, help="모델 가중치 디렉토리")
+    parser.add_argument('--load_from', default='../models', type=str, help="모델 로드 경로")
+    parser.add_argument('--save_dir', default='../checkouts', type=str, help="모델 가중치 디렉토리")
     parser.add_argument('--weight', default='dllm', type=str, help="가중치 이름 접두사")
     parser.add_argument('--hidden_size', default=768, type=int, help="은닉층 차원")
     parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 수")

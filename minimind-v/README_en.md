@@ -162,10 +162,10 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ### 2' Download resources
 
 ```bash
-# Download the SigLIP2 vision encoder to ./model/siglip2-base-p32-256-ve
-modelscope download --model gongjy/siglip2-base-p32-256-ve --local_dir ./model/siglip2-base-p32-256-ve
-# Download the MiniMind language model weight to ./out (used as the base language model for VLM training)
-modelscope download --model gongjy/minimind-3v-pytorch llm_768.pth --local_dir ./out
+# Download the SigLIP2 vision encoder to ./models/siglip2-base-p32-256-ve
+modelscope download --model gongjy/siglip2-base-p32-256-ve --local_dir ./models/siglip2-base-p32-256-ve
+# Download the MiniMind language model weight to ./checkouts (used as the base language model for VLM training)
+modelscope download --model gongjy/minimind-3v-pytorch llm_768.pth --local_dir ./checkouts
 ```
 
 Alternatively, the same files can be selected from the [ModelScope Collection](https://modelscope.cn/collections/gongjy/MiniMind-V) or [HuggingFace Collection](https://huggingface.co/collections/jingyaogong/minimind-v-67000833fb60b3a2e1f3597d) and downloaded with `git clone` (LFS required).
@@ -174,10 +174,10 @@ The directory should look like this after the resources are ready:
 
 ```text
 minimind-v/
-├── model/
+├── models/
 │   ├── siglip2-base-p32-256-ve/
 │   └── ...
-├── out/
+├── checkouts/
 │   └── llm_768.pth
 └── ...
 ```
@@ -187,8 +187,8 @@ minimind-v/
 ### 1' Download released weights
 
 ```bash
-# Download released weights to ./out
-modelscope download --model gongjy/minimind-3v-pytorch --local_dir ./out
+# Download released weights to ./checkouts
+modelscope download --model gongjy/minimind-3v-pytorch --local_dir ./checkouts
 ```
 
 ### 2' Command-line Q&A
@@ -229,18 +229,18 @@ If CUDA is unavailable, download the matching whl file from [torch_stable](https
 
 ### 1' Download data
 
-For a quick start, download `sft_i2t.parquet` from the [dataset link](https://huggingface.co/datasets/jingyaogong/minimind-v_dataset) and place it under `./dataset`.
+For a quick start, download `sft_i2t.parquet` from the [dataset link](https://huggingface.co/datasets/jingyaogong/minimind-v_dataset) and place it under `./datas`.
 
 <details style="color:rgb(128,128,128)">
 <summary>Note: dataset details</summary>
 
 **[Note 1]** The older dataset required extracting 500k fragmented image files, which could be very slow. Since 2025-12-27, the dataset has been unified into Parquet with image and text stored together. It is smaller, requires no decompression, and loads faster.
 
-**[Note 2]** Parquet is a columnar storage format with efficient compression and fast reading. If it is unfamiliar, run `python lm_dataset.py` under `dataset/` to visualize the first 5 image-text pairs.
+**[Note 2]** Parquet is a columnar storage format with efficient compression and fast reading. If it is unfamiliar, run `python lm_dataset.py` under `datas/` to visualize the first 5 image-text pairs.
 
 Pretrain data (optional; contains caption subset only):
 ```bash
-wget https://hf-mirror.com/datasets/jingyaogong/minimind-v_dataset/resolve/main/pretrain_i2t.parquet -P ./dataset
+wget https://hf-mirror.com/datasets/jingyaogong/minimind-v_datas/resolve/main/pretrain_i2t.parquet -P ./datas
 ```
 
 The single `sft_i2t.parquet` file contains 2.9M rows and absorbs Pretrain as a subset. After global dictionary encoding deduplication, it is only ~10% larger than the original SFT file and is enough to cover every training stage. For quick reproduction, Pretrain can be skipped and SFT can be started directly.
@@ -262,7 +262,7 @@ python train_pretrain_vlm.py --epochs 2 --from_weight llm
 python train_sft_vlm.py --epochs 2 --from_weight pretrain_vlm
 ```
 
-After training, `sft_vlm_*.pth` will be written under `out/` as the SFT weight.
+After training, `sft_vlm_*.pth` will be written under `checkouts/` as the SFT weight.
 
 <details style="color:rgb(128,128,128)">
 <summary>Note: training details</summary>
@@ -270,7 +270,7 @@ After training, `sft_vlm_*.pth` will be written under `out/` as the SFT weight.
 - Support checkpoint resumption: add `--from_resume 1` parameter to continue from last interruption
 - Support GPU count changes: automatically convert steps when GPU count changes during resumption
 - Atomic saving: use temporary file + replacement mechanism to prevent weight corruption from interruption
-- Each save generates `out/**.pth` (model weights) and `checkpoints/**_resume.pth` (training state) files
+- Each save generates `checkouts/**.pth` (model weights) and `checkouts/**_resume.pth` (training state) files
 
 ```bash
 # To resume training after interruption, use the same command and add --from_resume 1
@@ -288,7 +288,7 @@ python train_sft_vlm.py --epochs 4 --from_resume 1
 
 ### 3' Test a trained model (optional)
 
-Ensure that the model `*.pth` file you want to test is located in the `./out/` directory.
+Ensure that the model `*.pth` file you want to test is located in the `./checkouts/` directory.
 You can also directly download the pre-trained `*.pth` file
 from [here](https://huggingface.co/jingyaogong/minimind-3v-pytorch).
 
@@ -557,7 +557,7 @@ Prompt: `<image>\nPlease illustrate the image through your words.`
   <tbody>
     <tr>
       <td>
-        <img src="./dataset/eval_images/image-01-golden-dog-balloons.jpg" alt="golden-dog">
+        <img src="./datas/eval_images/image-01-golden-dog-balloons.jpg" alt="golden-dog">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       </td>
       <td>The image features a golden retriever in mid-motion, captured in mid-air, with its head tilted towards the camera. The dog, which appears to be a Golden Retriever, is in motion, with its tongue slightly out of focus, suggesting it's either waiting or turning. It has a distinctive blue tongue, which is a common feature in many dog breeds. The dog is standing on a grassy field with a few scattered clouds, and its mouth is open as if it is about to take a bite. The sky is partly cloudy, indicating fair weather. The lighting suggests it's daytime with ample sunlight, casting soft shadows on the grass and the grass.</td>
@@ -565,7 +565,7 @@ Prompt: `<image>\nPlease illustrate the image through your words.`
     </tr>
     <tr>
       <td>
-        <img src="./dataset/eval_images/image-02-rainbow-umbrella-street.jpg" alt="rainbow-umbrella">
+        <img src="./datas/eval_images/image-02-rainbow-umbrella-street.jpg" alt="rainbow-umbrella">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       </td>
       <td>The image shows a rain-shaped umbrella with a gradient of colors ranging from yellow to blue. The umbrella's umbrella is visible, showing a multicolored rainbow pattern with the gradient of colors. The water is illuminated by the rain, suggesting recent rain. The rainbow has a distinctive gradient of colors, primarily red, green, blue, yellow, and white, with the darker colors and the lighter colors on the umbrella's surface. In the background, there are buildings with red-roofed buildings, indicating a residential area. The weather appears overcast, and the lighting is soft, with no harsh shadows, indicating either early morning or late afternoon.</td>
@@ -573,7 +573,7 @@ Prompt: `<image>\nPlease illustrate the image through your words.`
     </tr>
     <tr>
       <td>
-        <img src="./dataset/eval_images/image-03-cherry-blossom-bike.jpg" alt="cherry-blossom-bike">
+        <img src="./datas/eval_images/image-03-cherry-blossom-bike.jpg" alt="cherry-blossom-bike">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       </td>
       <td>The image features a vibrant pink bicycle on a paved road, with a lush green palette dominated by pink and white blooms. The bicycle is positioned on a road, with a slightly elevated position and a brown handlebar on the right. The bicycle is positioned on a paved road, with a pedestal area visible on the left side of the frame, and a small, round, wooden frame with a rounded top. The bicycle is positioned in front of a white bicycle, and the background is softly blurred, with no discernible features that suggest a location or setting. The lighting is bright, and the overall mood of the image is peaceful and serene.</td>
@@ -581,7 +581,7 @@ Prompt: `<image>\nPlease illustrate the image through your words.`
     </tr>
     <tr>
       <td>
-        <img src="./dataset/eval_images/image-04-yellow-car.jpg" alt="yellow-car">
+        <img src="./datas/eval_images/image-04-yellow-car.jpg" alt="yellow-car">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       </td>
       <td>The image shows a bright yellow sports car positioned on a paved road. The car has a distinctive design with a long streamlined body, aerodynamic contours, and a long, streamlined body, typical of high-performance sports cars. The car's headlights are aerodynamic, and it has a low profile, aerodynamic brake, and a short, streamlined body. The windows appear to be tinted, and there's a clear sky above and a clear blue sky with few clouds. The car is parked on a road, with a hint of a flatbed traffic in the distance, indicating that this may be a busy road trip. The watermark "LOCKERS" is visible on the bottom right corner of the image, suggesting that this image may have been taken by a professional photographer or a promotional material.</td>
@@ -589,7 +589,7 @@ Prompt: `<image>\nPlease illustrate the image through your words.`
     </tr>
     <tr>
       <td>
-        <img src="./dataset/eval_images/image-05-superhero-rooftop.jpg" alt="superhero">
+        <img src="./datas/eval_images/image-05-superhero-rooftop.jpg" alt="superhero">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       </td>
       <td>The image depicts a man standing on a raised, stern, ornate torch. He is dressed in a vibrant red and blue suit with a white shirt and a red swoosh on his head. His suit is adorned with a red cross, suggesting a superhero's personal style. The torch is illuminated with warm light, possibly from the sun, creating a soft, diffused light that enhances the three-dimensional effect. The sky is partly cloudy, indicating either early morning or late afternoon light. The terrain is populated with numerous high-rise buildings, some of which have a tall, slender building with a white roof. The buildings appear to be part of a cityscape, possibly in the United States. The sky is partly cloudy, suggesting it's either sunrise or sunset. The image is taken during the golden hour, with the sun setting behind the torch and the sky.</td>
@@ -597,7 +597,7 @@ Prompt: `<image>\nPlease illustrate the image through your words.`
     </tr>
     <tr>
       <td>
-        <img src="./dataset/eval_images/image-06-racecar-drift.jpg" alt="racecar">
+        <img src="./datas/eval_images/image-06-racecar-drift.jpg" alt="racecar">
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
       </td>
       <td>The image captures a dynamic scene of a Ford Motor Company in mid-air, captured during twilight. The car is a Ford Motor Company, characterized by its sleek, aerodynamic design, with a high-performance tires suitable for diesel and aerodynamics. The car is equipped with a low-profile tires, which suggests it is designed for high-speed racing. The tires are marked with red and white markings, indicating a slightly rapid trajectory. The sky is clear with a soft gradient from light blue to orange near the horizon, suggesting either dawn or dusk. The racing has a modern design, with a prominent grille and side mirrors, which are characteristic of Motor Company's racing team. There are no visible race or other people in the immediate vicinity of the car. The car is on a track, indicating its position as a driver, and the background features a crowd of spectators, indicating the location might be in a competitive or high-speed racing area.</td>

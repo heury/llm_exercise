@@ -1,12 +1,15 @@
-mujoco==3.10.0
 pyautogui
 matplotlib
 scipy
 safetensors==0.5.3
-datasets==3.4.1
---extra-index-url https://download.pytorch.org/whl/cu124
-torch==2.6.0
-torchvision==0.21.0
-torchaudio==2.6.0
-transformers==4.50.3
-git+https://github.com/huggingface/lerobot.git@10b7b3532543b4adfb65760f02a49b4c537afde7#egg=lerobot
+mujoco==3.10.0
+lerobot[pi,smolvla]==0.6.0
+datasets==5.0.0
+av>=15.1.0
+torchcodec>=0.11.0,<0.12.0
+jsonlines>=4.0.0
+pandas>=2.3.3
+torch>=2.7,<2.12
+torchvision>=0.22,<0.27
+torchaudio>=2.7,<2.12
+transformers>=5.4,<5.6
