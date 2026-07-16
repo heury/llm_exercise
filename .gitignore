@@ -13,7 +13,7 @@ wheels/
 # Large local datasets and generated artifacts
 checkouts/
 models/
-dataset/
+datasets/
 
 # Backups of nested repository metadata after vendoring subdirectories
 .nested-git-backups/
