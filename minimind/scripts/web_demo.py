@@ -13,20 +13,20 @@ st.set_page_config(page_title="MiniMind", initial_sidebar_state="collapsed")
 
 st.markdown("""
     <style>
-        /* 添加操作按钮样式 */
+        /* 작업 버튼 스타일 추가 */
         .stButton button {
-            border-radius: 50% !important;  /* 改为圆形 */
-            width: 32px !important;         /* 固定宽度 */
-            height: 32px !important;        /* 固定高度 */
-            padding: 0 !important;          /* 移除内边距 */
+            border-radius: 50% !important;  /* 원형으로 변경 */
+            width: 32px !important;         /* 고정 너비 */
+            height: 32px !important;        /* 고정 높이 */
+            padding: 0 !important;          /* 안쪽 여백 제거 */
             background-color: transparent !important;
             border: 1px solid #ddd !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
             font-size: 14px !important;
-            color: #666 !important;         /* 更柔和的颜色 */
-            margin: 5px 10px 5px 0 !important;  /* 调整按钮间距 */
+            color: #666 !important;         /* 더 부드러운 색상 */
+            margin: 5px 10px 5px 0 !important;  /* 버튼 간격 조정 */
         }
         .stButton button:hover {
             border-color: #999 !important;
@@ -40,9 +40,9 @@ st.markdown("""
             margin-bottom: -35px !important;
         }
         
-        /* 重置按钮基础样式 */
+        /* 버튼 기본 스타일 재설정 */
         .stButton > button {
-            all: unset !important;  /* 重置所有默认样式 */
+            all: unset !important;  /* 모든 기본 스타일 재설정 */
             box-sizing: border-box !important;
             border-radius: 50% !important;
             width: 18px !important;
@@ -61,7 +61,7 @@ st.markdown("""
             color: #888 !important;
             cursor: pointer !important;
             transition: all 0.2s ease !important;
-            margin: 0 2px !important;  /* 调整这里的 margin 值 */
+            margin: 0 2px !important;  /* 여기의 margin 값 조정 */
         }
 
     </style>
@@ -69,33 +69,33 @@ st.markdown("""
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# 多语言文本
+# 다국어 텍스트
 LANG_TEXTS = {
     'zh': {
-        'settings': '模型设定调整',
-        'history_rounds': '历史对话轮次',
-        'max_length': '最大生成长度',
-        'temperature': '温度',
-        'thinking': '思考',
-        'tools': '工具',
-        'language': '语言',
-        'send': '给 MiniMind 发送消息',
-        'disclaimer': 'AI 生成内容可能存在错误，请仔细核实',
-        'think_tip': '自适应思考，目前多轮对话或Tool Call共存时思考不稳定',
-        'tool_select': '工具选择（最多4个）',
+        'settings': '모델 설정 조정',
+        'history_rounds': '이전 대화 턴 수',
+        'max_length': '최대 생성 길이',
+        'temperature': '온도',
+        'thinking': '사고',
+        'tools': '도구',
+        'language': '언어',
+        'send': 'MiniMind에 메시지 보내기',
+        'disclaimer': 'AI 생성 내용에는 오류가 있을 수 있으니 신중히 확인하세요',
+        'think_tip': '적응형 thinking은 현재 멀티턴 대화나 Tool Call과 함께 사용할 때 불안정할 수 있습니다',
+        'tool_select': '도구 선택(최대 4개)',
     },
     'en': {
-        'settings': 'Model Settings',
-        'history_rounds': 'History Rounds',
-        'max_length': 'Max Length',
-        'temperature': 'Temperature',
-        'thinking': 'Thinking',
-        'tools': 'Tools',
-        'language': 'Language',
-        'send': 'Send a message to MiniMind',
-        'disclaimer': 'AI-generated content may be inaccurate, please verify',
-        'think_tip': 'Adaptive thinking; may be unstable with multi-turn or Tool Call',
-        'tool_select': 'Tool Selection (max 4)',
+        'settings': '모델 설정',
+        'history_rounds': '이전 대화 턴 수',
+        'max_length': '최대 길이',
+        'temperature': '온도',
+        'thinking': '사고',
+        'tools': '도구',
+        'language': '언어',
+        'send': 'MiniMind에 메시지 보내기',
+        'disclaimer': 'AI 생성 내용에는 오류가 있을 수 있으니 확인하세요',
+        'think_tip': '적응형 thinking은 멀티턴이나 Tool Call과 함께 사용할 때 불안정할 수 있습니다',
+        'tool_select': '도구 선택(최대 4개)',
     }
 }
 
@@ -103,22 +103,22 @@ def get_text(key):
     lang = st.session_state.get('lang', 'en')
     return LANG_TEXTS.get(lang, {}).get(key, LANG_TEXTS['zh'].get(key, key))
 
-# 工具定义
+# 도구 정의
 TOOLS = [
-    {"type": "function", "function": {"name": "calculate_math", "description": "计算数学表达式", "parameters": {"type": "object", "properties": {"expression": {"type": "string", "description": "数学表达式"}}, "required": ["expression"]}}},
-    {"type": "function", "function": {"name": "get_current_time", "description": "获取当前时间", "parameters": {"type": "object", "properties": {"timezone": {"type": "string", "default": "Asia/Shanghai"}}, "required": []}}},
-    {"type": "function", "function": {"name": "random_number", "description": "生成随机数", "parameters": {"type": "object", "properties": {"min": {"type": "integer"}, "max": {"type": "integer"}}, "required": ["min", "max"]}}},
-    {"type": "function", "function": {"name": "text_length", "description": "计算文本长度", "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
-    {"type": "function", "function": {"name": "unit_converter", "description": "单位转换", "parameters": {"type": "object", "properties": {"value": {"type": "number"}, "from_unit": {"type": "string"}, "to_unit": {"type": "string"}}, "required": ["value", "from_unit", "to_unit"]}}},
-    {"type": "function", "function": {"name": "get_current_weather", "description": "获取天气", "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}}},
-    {"type": "function", "function": {"name": "get_exchange_rate", "description": "获取汇率", "parameters": {"type": "object", "properties": {"from_currency": {"type": "string"}, "to_currency": {"type": "string"}}, "required": ["from_currency", "to_currency"]}}},
-    {"type": "function", "function": {"name": "translate_text", "description": "翻译文本", "parameters": {"type": "object", "properties": {"text": {"type": "string"}, "target_lang": {"type": "string"}}, "required": ["text", "target_lang"]}}},
+    {"type": "function", "function": {"name": "calculate_math", "description": "수학 표현식 계산", "parameters": {"type": "object", "properties": {"expression": {"type": "string", "description": "수학 표현식"}}, "required": ["expression"]}}},
+    {"type": "function", "function": {"name": "get_current_time", "description": "현재 시간 가져오기", "parameters": {"type": "object", "properties": {"timezone": {"type": "string", "default": "Asia/Shanghai"}}, "required": []}}},
+    {"type": "function", "function": {"name": "random_number", "description": "무작위 수 생성", "parameters": {"type": "object", "properties": {"min": {"type": "integer"}, "max": {"type": "integer"}}, "required": ["min", "max"]}}},
+    {"type": "function", "function": {"name": "text_length", "description": "텍스트 길이 계산", "parameters": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}}},
+    {"type": "function", "function": {"name": "unit_converter", "description": "단위 변환", "parameters": {"type": "object", "properties": {"value": {"type": "number"}, "from_unit": {"type": "string"}, "to_unit": {"type": "string"}}, "required": ["value", "from_unit", "to_unit"]}}},
+    {"type": "function", "function": {"name": "get_current_weather", "description": "날씨 가져오기", "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}}},
+    {"type": "function", "function": {"name": "get_exchange_rate", "description": "환율 가져오기", "parameters": {"type": "object", "properties": {"from_currency": {"type": "string"}, "to_currency": {"type": "string"}}, "required": ["from_currency", "to_currency"]}}},
+    {"type": "function", "function": {"name": "translate_text", "description": "텍스트 번역", "parameters": {"type": "object", "properties": {"text": {"type": "string"}, "target_lang": {"type": "string"}}, "required": ["text", "target_lang"]}}},
 ]
 
 TOOL_SHORT_NAMES = {
-    'calculate_math': '数学', 'get_current_time': '时间', 'random_number': '随机',
-    'text_length': '字数', 'unit_converter': '单位', 'get_current_weather': '天气',
-    'get_exchange_rate': '汇率', 'translate_text': '翻译'
+    'calculate_math': '수학', 'get_current_time': '시간', 'random_number': '무작위',
+    'text_length': '글자 수', 'unit_converter': '단위', 'get_current_weather': '날씨',
+    'get_exchange_rate': '환율', 'translate_text': '번역'
 }
 
 def execute_tool(tool_name, args):
@@ -136,18 +136,18 @@ def execute_tool(tool_name, args):
         elif tool_name == 'unit_converter':
             return {"result": f"{args.get('value', 0)} {args.get('from_unit', '')} = ? {args.get('to_unit', '')}"}
         elif tool_name == 'get_current_weather':
-            return {"result": f"{args.get('city', 'Unknown')}: 晴, 7~10°C"}
+            return {"result": f"{args.get('city', 'Unknown')}: 맑음, 7~10°C"}
         elif tool_name == 'get_exchange_rate':
             return {"result": f"1 {args.get('from_currency', 'USD')} = 7.2 {args.get('to_currency', 'CNY')}"}
         elif tool_name == 'translate_text':
-            return {"result": f"[翻译结果]: hello world"}
+            return {"result": f"[번역 결과]: hello world"}
         return {"result": "Unknown tool"}
     except Exception as e:
         return {"error": str(e)}
 
 
 def process_assistant_content(content, is_streaming=False):
-    # 处理tool_call标签，格式化显示
+    # tool_call 태그를 처리해 보기 좋게 표시
     if '<tool_call>' in content:
         def format_tool_call(match):
             try:
@@ -159,36 +159,36 @@ def process_assistant_content(content, is_streaming=False):
                 return match.group(0)
         content = re.sub(r'<tool_call>(.*?)</tool_call>', format_tool_call, content, flags=re.DOTALL)
     
-    # 流式生成且开启思考时，一开始就放到折叠里
+    # 스트리밍 생성에서 thinking이 켜져 있으면 처음부터 접힘 영역에 넣음
     if is_streaming and st.session_state.get('enable_thinking', False) and '</think>' not in content and '<think>' not in content:
-        m = re.search(r'(\n\n(?:我是|您好|你好)[^\n]*)', content)
+        m = re.search(r'(\n\n(?:저는|안녕하세요|안녕하세요)[^\n]*)', content)
         if m and m.start(1) > 5:
             i = m.start(1)
             think_part = content[:i]
             answer_part = content[i:]
-            return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">已思考</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto;">{think_part.strip()}</div></details>{answer_part}'
+            return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">사고 완료</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto;">{think_part.strip()}</div></details>{answer_part}'
         elif len(content) > 5:
-            return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">思考中...</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto; display: flex; flex-direction: column-reverse;"><div style="margin-bottom: auto;">{content.strip().replace(chr(10), "<br>")}</div></div></details>'
+            return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">사고 중...</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto; display: flex; flex-direction: column-reverse;"><div style="margin-bottom: auto;">{content.strip().replace(chr(10), "<br>")}</div></div></details>'
 
     if '<think>' in content and '</think>' in content:
         def format_think(match):
             think_content = match.group(2)
-            if think_content.replace('\n', '').strip():  # 不是全换行
-                return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">已思考</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto;">{think_content.strip()}</div></details>'
+            if think_content.replace('\n', '').strip():  # 전부 줄바꿈은 아님
+                return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">사고 완료</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto;">{think_content.strip()}</div></details>'
             return ''
         content = re.sub(r'(<think>)(.*?)(</think>)', format_think, content, flags=re.DOTALL)
 
     if '<think>' in content and '</think>' not in content:
         def format_think_in_progress(match):
             tc = match.group(1)
-            return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">思考中...</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto; display: flex; flex-direction: column-reverse;"><div style="margin-bottom: auto;">{tc.strip().replace(chr(10), "<br>")}</div></div></details>'
+            return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">사고 중...</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto; display: flex; flex-direction: column-reverse;"><div style="margin-bottom: auto;">{tc.strip().replace(chr(10), "<br>")}</div></div></details>'
         content = re.sub(r'<think>(.*?)$', format_think_in_progress, content, flags=re.DOTALL)
 
     if '<think>' not in content and '</think>' in content:
         def format_think_no_start(match):
             think_content = match.group(1)
             if think_content.replace('\n', '').strip():
-                return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">已思考</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto;">{think_content.strip()}</div></details>'
+                return f'<details open style="border-left: 2px solid #666; padding-left: 12px; margin: 8px 0;"><summary style="cursor: pointer; color: #888;">사고 완료</summary><div style="color: #aaa; font-size: 0.95em; margin-top: 8px; max-height: 100px; overflow-y: auto;">{think_content.strip()}</div></details>'
             return ''
         content = re.sub(r'(.*?)</think>', format_think_no_start, content, flags=re.DOTALL)
 
@@ -236,7 +236,7 @@ def regenerate_answer(index):
     st.rerun()
 
 
-# 动态扫描模型目录
+# 모델 디렉터리 동적 스캔
 script_dir = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATHS = {}
 for d in sorted(os.listdir(script_dir), reverse=True):
@@ -247,32 +247,32 @@ for d in sorted(os.listdir(script_dir), reverse=True):
 if not MODEL_PATHS:
     MODEL_PATHS = {"No models found": ["", "No models"]}
 
-# 模型选择
+# 모델 선택
 selected_model = st.sidebar.selectbox('Model', list(MODEL_PATHS.keys()), index=0)
 model_path = MODEL_PATHS[selected_model][0]
-slogan = f"我是 {MODEL_PATHS[selected_model][1]}，有什么可以帮你的？" if st.session_state.get('lang', 'en') == 'zh' else f"I am {MODEL_PATHS[selected_model][1]}, how can I help you?"
+slogan = f"저는 {MODEL_PATHS[selected_model][1]}，무엇을 도와드릴까요?" if st.session_state.get('lang', 'en') == 'zh' else f"I am {MODEL_PATHS[selected_model][1]}, how can I help you?"
 
 st.sidebar.markdown('<hr style="margin: 12px 0 16px 0;">', unsafe_allow_html=True)
 
-# 语言选择
-lang_options = {'中文': 'zh', 'English': 'en'}
+# 언어 선택
+lang_options = {'중국어': 'zh', 'English': 'en'}
 current_lang = st.session_state.get('lang', 'en')
 lang_index = 0 if current_lang == 'zh' else 1
-lang_label = st.sidebar.radio('Language / 语言', list(lang_options.keys()), index=lang_index, horizontal=True)
+lang_label = st.sidebar.radio('언어 / 언어', list(lang_options.keys()), index=lang_index, horizontal=True)
 if lang_options[lang_label] != current_lang:
     st.session_state.lang = lang_options[lang_label]
     st.rerun()
 
 st.sidebar.markdown('<hr style="margin: 12px 0 16px 0;">', unsafe_allow_html=True)
 
-# 参数设置
+# 파라미터 설정
 st.session_state.history_chat_num = st.sidebar.slider(get_text('history_rounds'), 0, 8, 0, step=2)
 st.session_state.max_new_tokens = st.sidebar.slider(get_text('max_length'), 256, 8192, 8192, step=1)
 st.session_state.temperature = st.sidebar.slider(get_text('temperature'), 0.6, 1.2, 0.90, step=0.01)
 
 st.sidebar.markdown('<hr style="margin: 12px 0 16px 0;">', unsafe_allow_html=True)
 
-# 功能开关
+# 기능 스위치
 st.session_state.enable_thinking = st.sidebar.checkbox(get_text('thinking'), value=False, help=get_text('think_tip'))
 st.session_state.selected_tools = []
 with st.sidebar.expander(get_text('tools')):
@@ -348,7 +348,7 @@ def main():
         setup_seed(random_seed)
 
         tools = [t for t in TOOLS if t['function']['name'] in st.session_state.get('selected_tools', [])] or None
-        sys_prompt = [] if tools else [{"role": "system", "content": "你是MiniMind，一个乐于助人、知识渊博的AI助手。请用完整且友好的方式回答用户问题。"}]
+        sys_prompt = [] if tools else [{"role": "system", "content": "당신은 MiniMind입니다. 도움을 주는 지식 풍부한 AI 어시스턴트입니다. 사용자의 질문에 완전하고 친절하게 답하세요."}]
         st.session_state.chat_messages = sys_prompt + st.session_state.chat_messages[-(st.session_state.history_chat_num + 1):]
         template_kwargs = {"tokenize": False, "add_generation_prompt": True}
         if st.session_state.get('enable_thinking', False):

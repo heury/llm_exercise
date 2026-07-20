@@ -161,9 +161,9 @@ document.getElementById('prompt').addEventListener('keydown',e=>{if(e.key==='Ent
 def load_model():
     global model, tokenizer, device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    tokenizer = AutoTokenizer.from_pretrained('../../minimind_model')
+    tokenizer = AutoTokenizer.from_pretrained('../../models')
     model = MiniMindForMaskedDiffusion(MiniMindDLLMConfig(hidden_size=768, num_hidden_layers=8))
-    ckp = '../../minimind_out/dllm_768.pth'
+    ckp = '../../checkouts/dllm_768.pth'
     if os.path.exists(ckp): model.load_state_dict(torch.load(ckp, map_location=device), strict=False)
     model = model.half().eval().to(device)
     print(f"[모델 로드 완료] device={device}")

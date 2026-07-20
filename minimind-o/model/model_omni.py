@@ -104,7 +104,7 @@ class TalkerModule(nn.Module):
 
 class MiniMindOmni(MiniMindForCausalLM):
     config_class = OmniConfig
-    def __init__(self, config: OmniConfig = None, audio_encoder_path="C:/dev/llm_exercise/minimind_model/SenseVoiceSmall", vision_model_path="C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve"):
+    def __init__(self, config: OmniConfig = None, audio_encoder_path="../models/SenseVoiceSmall", vision_model_path="../models/siglip2-base-p32-256-ve"):
         config = config or OmniConfig()
         super().__init__(config)
         object.__setattr__(self, 'thinker', self.model)  # alias: self.thinker == self.model
@@ -254,7 +254,7 @@ class MiniMindOmni(MiniMindForCausalLM):
         n_thinker, n_talker = len(self.thinker.layers), len(self.talker.layers)
         past_key_values = past_key_values or ([None] * (n_thinker + n_talker))
         start_pos = past_key_values[0][0].shape[1] if past_key_values[0] is not None else 0
-        # Recompute RoPE buffers lost during meta-device init (transformers>=5.x)
+        # meta-device 초기화 중 손실된 RoPE 버퍼 재계산(transformers>=5.x)
         if self.thinker.freqs_cos[0, 0] == 0:
             freqs_cos, freqs_sin = precompute_freqs_cis(dim=self.config.head_dim, end=self.config.max_position_embeddings, rope_base=self.config.rope_theta, rope_scaling=self.config.rope_scaling)
             self.thinker.freqs_cos, self.thinker.freqs_sin = freqs_cos.to(input_ids.device), freqs_sin.to(input_ids.device)
@@ -360,8 +360,8 @@ class MiniMindOmni(MiniMindForCausalLM):
                 text_token = args.get('enter_token_id', 201) if first_finished else args.get('pad_token_id', 0)
                 first_finished = False
 
-            step = input_ids.shape[1] - start_pos  # 已生成token数（0=首次，此时模型处理prompt末尾token）
-            audio_step = step - 1  # 延迟1步：输出第1个text时无audio，输出第2个text时layer0开始
+            step = input_ids.shape[1] - start_pos  # 생성된 token 수(0=첫 호출, 이때 모델은 prompt 끝 token 처리)
+            audio_step = step - 1  # 1스텝 지연: 첫 번째 text 출력 시 audio 없음, 두 번째 text 출력 시 layer0 시작
             if generated_tokens is not None:
                 generated_tokens.append(text_token)
                 if not think_end_step and generated_tokens[-len(self.config.think_end_ids):] == list(self.config.think_end_ids): think_end_step = step + 2
@@ -395,7 +395,7 @@ class MiniMindOmni(MiniMindForCausalLM):
                 yield None, audio_frame
 
 
-# ==== Realtime VAD (与模型本体零耦合，纯工程层) ====
+# ==== Realtime VAD(모델 본체와 결합 없는 순수 엔지니어링 계층) ====
 class SileroVAD:
     def __init__(self, path):
         opts = ort.SessionOptions()

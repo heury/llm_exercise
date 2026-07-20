@@ -38,7 +38,7 @@ MiniMind의 일반적인 학습 파이프라인은 다음 순서로 이어집니
 ### 사용 데이터
 
 - 데이터셋 클래스: `PretrainDataset`
-- 기본 경로: `../../minimind_dataset/pretrain_t2t_mini.jsonl`
+- 기본 경로: `../../datas/pretrain_t2t_mini.jsonl`
 - 주요 처리:
   - 긴 텍스트를 tokenizer로 토큰화
   - `max_seq_len` 길이에 맞춰 자르거나 패딩
@@ -140,9 +140,9 @@ MiniMind의 일반적인 학습 파이프라인은 다음 순서로 이어집니
 
 ### 저장 산출물
 
-- 일반 가중치: `../../minimind_out/pretrain_{hidden_size}.pth`
-- MoE 가중치: `../../minimind_out/pretrain_{hidden_size}_moe.pth`
-- resume checkpoint: `../../minimind_out/checkpoints/pretrain_{hidden_size}[_moe]_resume.pth`
+- 일반 가중치: `../../checkouts/pretrain_{hidden_size}.pth`
+- MoE 가중치: `../../checkouts/pretrain_{hidden_size}_moe.pth`
+- resume checkpoint: `../../checkouts/pretrain_{hidden_size}[_moe]_resume.pth`
 
 ## train_full_sft.py
 
@@ -151,7 +151,7 @@ MiniMind의 일반적인 학습 파이프라인은 다음 순서로 이어집니
 pretrain 대비 달라지는 점:
 
 - 데이터셋이 `PretrainDataset`에서 `SFTDataset`으로 바뀝니다.
-- 기본 데이터 경로가 `../../minimind_dataset/sft_t2t_mini.jsonl`입니다.
+- 기본 데이터 경로가 `../../datas/sft_t2t_mini.jsonl`입니다.
 - 기본 시작 가중치가 `from_weight=pretrain`입니다.
 - 저장 접두사가 `full_sft`입니다.
 - 학습률이 `5e-4`에서 `1e-5`로 낮아집니다.

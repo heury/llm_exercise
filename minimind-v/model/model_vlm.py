@@ -32,11 +32,11 @@ class MMVisionProjector(nn.Module):
     def forward(self, x):
         return self.mlp(x)
 
-# 继承自语言模型
+# 언어 모델에서 상속
 class MiniMindVLM(MiniMindForCausalLM):
     config_class = VLMConfig
 
-    def __init__(self, config: VLMConfig = None, vision_model_path="C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve"):
+    def __init__(self, config: VLMConfig = None, vision_model_path="../models/siglip2-base-p32-256-ve"):
         self.config = config or VLMConfig()
         super().__init__(self.config)
         self.vision_encoder, self.processor = self.__class__.get_vision_model(vision_model_path)
@@ -53,7 +53,7 @@ class MiniMindVLM(MiniMindForCausalLM):
         except (RuntimeError, ValueError):
             return None, None
         processor = SiglipImageProcessor.from_pretrained(model_path)
-        # 冻结 vision_encoder 的所有参数
+        # vision_encoder의 모든 파라미터 동결
         for param in model.parameters():
             param.requires_grad = False
         return model.eval(), processor
@@ -126,7 +126,7 @@ class MiniMindVLM(MiniMindForCausalLM):
                 vision_tensors = torch.stack([self.vision_proj(MiniMindVLM.get_image_embeddings(pixel_values[:, i, :, :, :], self.vision_encoder)) for i in range(num)], dim=1)
             hidden_states = self.count_vision_proj(tokens=input_ids, h=hidden_states, vision_tensors=vision_tensors, seqlen=input_ids.shape[1])
 
-        # Recompute RoPE buffers lost during meta-device init (transformers>=5.x)
+        # meta-device 초기화 중 손실된 RoPE 버퍼 재계산(transformers>=5.x)
         if self.model.freqs_cos[0, 0] == 0:
             freqs_cos, freqs_sin = precompute_freqs_cis(dim=self.config.head_dim, end=self.config.max_position_embeddings, rope_base=self.config.rope_theta, rope_scaling=self.config.rope_scaling)
             self.model.freqs_cos, self.model.freqs_sin = freqs_cos.to(hidden_states.device), freqs_sin.to(hidden_states.device)

@@ -248,8 +248,8 @@ git clone https://huggingface.co/jingyaogong/minimind-3
 ```bash
 # Method 1: Using Transformers format model
 python eval_llm.py --load_from ./minimind-3
-# Method 2: Based on PyTorch model (ensure corresponding weights are in the ./out directory)
-python eval_llm.py --load_from ./model --weight full_sft
+# Method 2: Based on PyTorch model (ensure corresponding weights are in the ./checkouts directory)
+python eval_llm.py --load_from ./models --weight full_sft
 ```
 
 ### 3' (Optional) WebUI
@@ -287,7 +287,7 @@ If you need to install or switch PyTorch versions, refer to [torch_stable](https
 
 ### 1' Download Data
 
-Download the required data files from the [dataset download link](https://www.modelscope.cn/datasets/gongjy/minimind_dataset/files) provided below, and place them in the `./dataset` directory
+Download the required data files from the [dataset download link](https://www.modelscope.cn/datasets/gongjy/datas/files) provided below, and place them in the `./datas` directory
 
 > Currently, by default, you only need to download `pretrain_t2t_mini.jsonl` and `sft_t2t_mini.jsonl` to quickly reproduce the `MiniMind Zero` dialogue model.
 For other use cases, several data combinations are provided below and can be selected according to your task objectives and GPU resources.
@@ -306,7 +306,7 @@ python train_full_sft.py --from_resume 1
 ```
 
 **Checkpoint Resume Instructions:**
-- The training process automatically saves complete checkpoints (model, optimizer, training progress, etc.) in the `./checkpoints/` directory
+- The training process automatically saves complete checkpoints (model, optimizer, training progress, etc.) in the `./checkouts/` directory
 - Checkpoint file naming: `<weight_name>_<dimension>_resume.pth` (e.g., `full_sft_512_resume.pth`)
 - Supports recovery across different GPU counts (automatically adjusts step)
 - Supports wandb training record continuity (automatically resumes the same run)
@@ -321,7 +321,7 @@ python train_full_sft.py --from_resume 1
 cd trainer && python train_pretrain.py
 ```
 
-> After training, `out/pretrain_*.pth` will be produced as output weights (where `*` is the model dimension, default `768`)
+> After training, `checkouts/pretrain_*.pth` will be produced as output weights (where `*` is the model dimension, default `768`)
 
 #### 2.2 Instruction Fine-tuning (Required)
 
@@ -329,11 +329,11 @@ cd trainer && python train_pretrain.py
 cd trainer && python train_full_sft.py
 ```
 
-> After training, `out/full_sft_*.pth` will be produced as output weights (where `full` indicates full-parameter fine-tuning)
+> After training, `checkouts/full_sft_*.pth` will be produced as output weights (where `full` indicates full-parameter fine-tuning)
 
 #### 2.3 Test Trained Model (Optional)
 
-Ensure the model `*.pth` files to be tested are located in the `./out/` directory; you can also go directly to [here](https://www.modelscope.cn/models/gongjy/minimind-3-pytorch/files) to download my pre-trained `*.pth` weights.
+Ensure the model `*.pth` files to be tested are located in the `./checkouts/` directory; you can also go directly to [here](https://www.modelscope.cn/models/gongjy/minimind-3-pytorch/files) to download my pre-trained `*.pth` weights.
 
 ```bash
 python eval_llm.py --weight full_sft
@@ -483,14 +483,14 @@ Besides this, other RL data maintains the same format as SFT data, typically fil
 > [!NOTE]
 > The core datasets needed for the current main branch training have been open-sourced, so you do not need to preprocess large-scale datasets yourself.
 
-MiniMind training dataset download links: [ModelScope](https://www.modelscope.cn/datasets/gongjy/minimind_dataset/files) | [HuggingFace](https://huggingface.co/datasets/jingyaogong/minimind_dataset/tree/main)
+MiniMind training dataset download links: [ModelScope](https://www.modelscope.cn/datasets/gongjy/datas/files) | [HuggingFace](https://huggingface.co/datasets/jingyaogong/datas/tree/main)
 
 > No need to clone everything, you can download individual files as needed
 
-Place the downloaded dataset files in the `./dataset/` directory (✨ indicates recommended essentials)
+Place the downloaded dataset files in the `./datas/` directory (✨ indicates recommended essentials)
 
 ```bash
-./dataset/
+./datas/
 ├── agent_rl.jsonl (86MB)
 ├── agent_rl_math.jsonl (18MB)
 ├── dpo.jsonl (53MB)
@@ -1010,7 +1010,7 @@ After downloading the reward model, it needs to be placed in the **sibling direc
 ```
 root/
 ├── minimind/                    # MiniMind project
-│   ├── model/
+│   ├── models/
 │   └── ...
 └── internlm2-1_8b-reward/       # Reward model
     ├── config.json
@@ -1214,7 +1214,7 @@ python train_agent.py
 # Start sglang server first:
 python -m sglang.launch_server --model-path ./minimind-3 --attention-backend triton --host 0.0.0.0 --port 8998
 # Training parameters for reference:
-python train_agent.py --rollout_engine sglang --sglang_base_url http://localhost:8998 --sglang_shared_path ./ckpt_mm --data_path ../dataset/agent_rl_math.jsonl --use_wandb
+python train_agent.py --rollout_engine sglang --sglang_base_url http://localhost:8998 --sglang_shared_path ./ckpt_mm --data_path ../datas/agent_rl_math.jsonl --use_wandb
 ```
 
 > The trained model weight files are saved by default every `save_interval steps` as: `agent_*.pth`
@@ -1598,7 +1598,7 @@ MiniMind is trained on far less data than the other models listed here, and its 
 <details>
 <summary><strong>Additional note (source / no contamination / reproduction)</strong></summary>
 
-minimind-3-exam is not a larger base model, and it contains little if any new knowledge. It is simply minimind-3 after a lightweight LoRA alignment on [lora_exam.jsonl](https://huggingface.co/datasets/jingyaogong/minimind_dataset/blob/main/lora_exam.jsonl), with [lora_exam_768.pth](https://huggingface.co/jingyaogong/minimind-3-pytorch/resolve/main/lora_exam_768.pth) merged back into the base model. This alignment data is sampled from the test subsets of ceval and English mmlu, with additional prefix/suffix augmentation. Its purpose is to align the context and option format commonly seen in multiple-choice evaluation, rather than to teach the answers.
+minimind-3-exam is not a larger base model, and it contains little if any new knowledge. It is simply minimind-3 after a lightweight LoRA alignment on [lora_exam.jsonl](https://huggingface.co/datasets/jingyaogong/datas/blob/main/lora_exam.jsonl), with [lora_exam_768.pth](https://huggingface.co/jingyaogong/minimind-3-pytorch/resolve/main/lora_exam_768.pth) merged back into the base model. This alignment data is sampled from the test subsets of ceval and English mmlu, with additional prefix/suffix augmentation. Its purpose is to align the context and option format commonly seen in multiple-choice evaluation, rather than to teach the answers.
 
 The 7 benchmarks used in this section have no sample overlap with the alignment data above, so this result can be regarded as free of data contamination. By contrast, if one fine-tunes directly on overlapping data, the scores of a small model can become heavily distorted; for example, minimind-3 once reached about 97% accuracy on contaminated ceval / cmmlu subsets, but such numbers are not meaningful.
 
@@ -1693,7 +1693,7 @@ llama.cpp is a lightweight and practical C++ inference framework that can be use
 ```
 parent/
 ├── project/           # your project directory
-│   ├── minimind-model/       # HuggingFace-format model directory
+│   ├── minimind-models/       # HuggingFace-format model directory
 │   │   ├── config.json
 │   │   ├── model.safetensors
 │   │   └── ...
@@ -1724,13 +1724,13 @@ python convert_hf_to_gguf.py /path/to/minimind-model
 3. Quantize the model (optional)
 
 ```bash
-./build/bin/llama-quantize /path/to/model/xxxx.gguf /path/to/model/xxxx.q8.gguf Q8_0
+./build/bin/llama-quantize /path/to/models/xxxx.gguf /path/to/models/xxxx.q8.gguf Q8_0
 ```
 
 4. Command-line inference test
 
 ```bash
-./build/bin/llama-cli -m /path/to/model/xxxx.gguf
+./build/bin/llama-cli -m /path/to/models/xxxx.gguf
 ```
 
 ## <img src="https://ollama.com/public/cloud.png" height="28" style="vertical-align: middle;"/> [ollama](https://ollama.ai)
@@ -1745,7 +1745,7 @@ Create a new `minimind.modelfile` file in the model directory and write the foll
 <summary>minimind.modelfile (template)</summary>
 
 ```text
-FROM /path/to/model/xxxx.gguf
+FROM /path/to/models/xxxx.gguf
 
 SYSTEM "你的名字叫MiniMind，你是一个乐于助人、知识渊博的AI助手。请用完整且友好的方式回答用户问题，当被问到名字时请回答MiniMind。"
 

@@ -1,5 +1,5 @@
 """
-训练工具函数集合
+학습 유틸리티 함수 모음
 """
 import os
 import sys
@@ -26,8 +26,8 @@ def get_model_params(model, config, ignore_patterns=['vision_encoder']):
     shared_expert = sum(p.numel() for n, p in model.named_parameters() if 'mlp.shared_experts.0.' in n and should_count(n)) / 1e6
     base = total - (expert * n_routed) - (shared_expert * n_shared)
     active = base + (expert * n_active) + (shared_expert * n_shared)
-    if active < total: Logger(f'Model Params: {total:.2f}M-A{active:.2f}M')
-    else: Logger(f'Model Params: {total:.2f}M')
+    if active < total: Logger(f'모델 파라미터: {total:.2f}M-A{active:.2f}M')
+    else: Logger(f'모델 파라미터: {total:.2f}M')
 
 
 def is_main_process():
@@ -45,7 +45,7 @@ def get_lr(current_step, total_steps, lr):
 
 def init_distributed_mode():
     if int(os.environ.get("RANK", -1)) == -1:
-        return 0  # 非DDP模式
+        return 0  # Non-DDP 모드
     
     dist.init_process_group(backend="nccl")
     local_rank = int(os.environ["LOCAL_RANK"])
@@ -63,7 +63,7 @@ def setup_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
-def init_vlm_model(vlm_config, from_weight='pretrain_vlm', tokenizer_path='C:/dev/llm_exercise/minimind_model', vision_model_path='C:/dev/llm_exercise/minimind_model/siglip2-base-p32-256-ve', save_dir='C:/dev/llm_exercise/minimind_out', device='cuda', freeze_llm=0):
+def init_vlm_model(vlm_config, from_weight='pretrain_vlm', tokenizer_path='../../models', vision_model_path='../../models/siglip2-base-p32-256-ve', save_dir='../../checkouts', device='cuda', freeze_llm=0):
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     model = MiniMindVLM(vlm_config, vision_model_path=vision_model_path)
     
@@ -73,12 +73,12 @@ def init_vlm_model(vlm_config, from_weight='pretrain_vlm', tokenizer_path='C:/de
         weights = torch.load(weight_path, map_location=device)
         model.load_state_dict(weights, strict=False)
     
-    # 1、全部冻结，只打开vision_proj梯度
+    # 1. 전체를 동결하고 vision_proj에만 gradient 활성화
     for name, param in model.named_parameters():
         if 'vision_proj' not in name:
             param.requires_grad = False
 
-    # 2、判断策略
+    # 2. 정책 결정
     if freeze_llm == 0:
         for name, param in model.named_parameters():
             if 'vision_encoder' not in name:
@@ -92,12 +92,12 @@ def init_vlm_model(vlm_config, from_weight='pretrain_vlm', tokenizer_path='C:/de
         pass
 
     get_model_params(model, vlm_config)
-    Logger(f'Trainable Params: {sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.3f}M')
+    Logger(f'학습 가능 파라미터 수: {sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6:.3f}M')
     preprocess = model.processor
     return model.to(device), tokenizer, preprocess
 
 
-def vlm_checkpoint(vlm_config, weight='pretrain_vlm', model=None, optimizer=None, epoch=0, step=0, wandb=None, save_dir='C:/dev/llm_exercise/minimind_out/checkpoints', **kwargs):
+def vlm_checkpoint(vlm_config, weight='pretrain_vlm', model=None, optimizer=None, epoch=0, step=0, wandb=None, save_dir='../../checkouts', **kwargs):
     os.makedirs(save_dir, exist_ok=True)
     moe_path = '_moe' if vlm_config.use_moe else ''
     ckp_path = f'{save_dir}/{weight}_{vlm_config.hidden_size}{moe_path}.pth'
@@ -107,7 +107,7 @@ def vlm_checkpoint(vlm_config, weight='pretrain_vlm', model=None, optimizer=None
         raw_model = model.module if isinstance(model, DistributedDataParallel) else model
         raw_model = getattr(raw_model, '_orig_mod', raw_model)
         state_dict = raw_model.state_dict()
-        # 移除vision_encoder参数（不需要保存，因为是预训练的）
+        # vision_encoder 파라미터 제거; 사전학습된 파라미터라 저장할 필요 없음
         clean_state_dict = {k: v for k, v in state_dict.items() if not k.startswith('vision_encoder.')}
         ckp_tmp = ckp_path + '.tmp'
         torch.save({k: v.half().cpu() for k, v in clean_state_dict.items()}, ckp_tmp)
@@ -143,14 +143,14 @@ def vlm_checkpoint(vlm_config, weight='pretrain_vlm', model=None, optimizer=None
         os.replace(resume_tmp, resume_path)
         del state_dict, clean_state_dict, resume_data
         torch.cuda.empty_cache()
-    else:  # 加载模式
+    else:  # 로드 모드
         if os.path.exists(resume_path):
             ckp_data = torch.load(resume_path, map_location='cpu')
             saved_ws = ckp_data.get('world_size', 1)
             current_ws = dist.get_world_size() if dist.is_initialized() else 1
             if saved_ws != current_ws:
                 ckp_data['step'] = ckp_data['step'] * saved_ws // current_ws
-                Logger(f'GPU数量变化({saved_ws}→{current_ws})，step已自动转换为{ckp_data["step"]}')
+                Logger(f'GPU 수 변경({saved_ws}→{current_ws}); step이 자동 변환되었습니다: {ckp_data["step"]}')
             return ckp_data
         return None
 
@@ -190,4 +190,3 @@ class SkipBatchSampler(Sampler):
     def __len__(self):
         total_batches = (len(self.sampler) + self.batch_size - 1) // self.batch_size
         return max(0, total_batches - self.skip_batches)
-
