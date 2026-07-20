@@ -1,7 +1,28 @@
 {
+    "python-envs.alwaysUseUv": true,
     "python-envs.pythonProjects": [
         {
             "path": ".",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        },
+        {
+            "path": "minimind",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        },
+        {
+            "path": "minimind-v",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        },
+        {
+            "path": "llm-from-scratch",
+            "envManager": "ms-python.python:venv",
+            "packageManager": "ms-python.python:pip"
+        },
+        {
+            "path": "lerobot-mujoco-tutorial",
             "envManager": "ms-python.python:venv",
             "packageManager": "ms-python.python:pip"
         }

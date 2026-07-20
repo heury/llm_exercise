@@ -146,7 +146,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 수")
     parser.add_argument('--max_seq_len', default=1024, type=int, help="학습 시 최대 절단 길이(중국어 기준 1토큰은 약 1.5~1.7자)")
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부(0=아니오, 1=예)")
-    parser.add_argument("--data_path", type=str, default="../datasets/dpo.jsonl", help="DPO 학습 데이터 경로")
+    parser.add_argument("--data_path", type=str, default="../datasets/dpo_english_orca_pairs_mini.jsonl", help="DPO 학습 데이터 경로")
     parser.add_argument('--from_weight', default='full_sft', type=str, help="어떤 가중치에서 학습을 시작할지 지정합니다")
     parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="자동 감지 후 이어서 학습할지 여부(0=아니오, 1=예)")
     parser.add_argument('--beta', default=0.15, type=float, help="DPO의 beta 파라미터")

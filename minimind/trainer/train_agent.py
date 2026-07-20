@@ -47,10 +47,10 @@ TOOLS = [
 ]
 
 # ======== 모의 데이터 ========
-WEATHER_DATA = {"Beijing": ("28°C", "sunny"), "Shanghai": ("15°C", "cloudy"), "Guangzhou": ("32°C", "muggy"), "Shenzhen": ("30°C", "sunny"), "Hangzhou": ("22°C", "overcast"), "Chengdu": ("18°C", "light rain"), "Wuhan": ("25°C", "cloudy"), "Nanjing": ("20°C", "sunny"), "Xian": ("16°C", "windy"), "Chongqing": ("26°C", "overcast"), "Tokyo": ("12°C", "sunny"), "New York": ("8°C", "cloudy"), "London": ("5°C", "light rain"), "Paris": ("10°C", "overcast"), "Sydney": ("25°C", "clear")}
+WEATHER_DATA = {"Beijing": ("28°C", "sunny"), "Shanghai": ("15°C", "cloudy"), "Guangzhou": ("32°C", "muggy"), "Shenzhen": ("30°C", "sunny"), "Hangzhou": ("22°C", "overcast"), "Chengdu": ("18°C", "light rain"), "Wuhan": ("25°C", "cloudy"), "Nanjing": ("20°C", "sunny"), "Xi'an": ("16°C", "windy"), "Chongqing": ("26°C", "overcast"), "Tokyo": ("12°C", "sunny"), "New York": ("8°C", "cloudy"), "London": ("5°C", "light rain"), "Paris": ("10°C", "overcast"), "Sydney": ("25°C", "clear")}
 TIME_DATA = {"Asia/Shanghai": "2025-03-07 14:30:00", "America/New_York": "2025-03-07 01:30:00", "Europe/London": "2025-03-07 06:30:00", "Asia/Tokyo": "2025-03-07 15:30:00", "Europe/Paris": "2025-03-07 07:30:00", "Australia/Sydney": "2025-03-07 17:30:00"}
 EXCHANGE_DATA = {("USD", "CNY"): 7.21, ("EUR", "CNY"): 7.85, ("GBP", "CNY"): 9.12, ("JPY", "CNY"): 0.048, ("USD", "EUR"): 0.92, ("USD", "GBP"): 0.79, ("CNY", "JPY"): 20.83, ("AUD", "CNY"): 4.72}
-TRANSLATE_DATA = {("안녕하세요 world", "english"): "안녕하세요 World", ("Good morning", "chinese"): "Good morning", ("The weather is nice today", "english"): "The weather is nice today", ("I love programming", "chinese"): "I love programming", ("Machine learning is interesting", "english"): "Machine learning is interesting", ("Happy birthday", "chinese"): "Happy birthday"}
+TRANSLATE_DATA = {("你好世界", "english"): "Hello World", ("Good morning", "chinese"): "早上好", ("今天天气真好", "english"): "The weather is nice today", ("I love programming", "chinese"): "我喜欢编程", ("机器学习很有趣", "english"): "Machine learning is interesting", ("Happy birthday", "chinese"): "生日快乐"}
 UNIT_DATA = {"km_miles": 0.621371, "miles_km": 1.60934, "kg_pounds": 2.20462, "pounds_kg": 0.453592, "meters_feet": 3.28084, "feet_meters": 0.3048, "celsius_fahrenheit": 1.8, "fahrenheit_celsius": 0.5556}
 
 # ======== 모의 실행 ========
@@ -405,7 +405,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug_mode", action="store_true", help="디버그 모드")
     parser.add_argument("--debug_interval", type=int, default=20, help="디버그 로그 간격")
     parser.add_argument("--thinking_ratio", type=float, default=0.1, help="이 확률로 thinking을 활성화합니다(0.0~1.0)")
-    parser.add_argument("--reward_model_path", type=str, default="../internlm2-1_8b-reward", help="리워드 모델 경로")
+    parser.add_argument("--reward_model_path", type=str, default="../models/internlm2-1_8b-reward", help="리워드 모델 경로")
     parser.add_argument("--rollout_engine", type=str, default="torch", choices=["torch", "sglang"], help="롤아웃 엔진 타입")
     parser.add_argument("--sglang_base_url", type=str, default="http://localhost:8998", help="SGLang 서버 URL")
     parser.add_argument("--sglang_model_path", type=str, default="../models", help="SGLang 토크나이저 경로")

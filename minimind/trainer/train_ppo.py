@@ -324,7 +324,7 @@ if __name__ == "__main__":
     parser.add_argument("--early_stop_kl", type=float, default=0.25, help="PPO 조기 중단 KL 임계값")
     parser.add_argument("--mini_batch_size", type=int, default=2, help="각 PPO 업데이트의 미니배치 크기")
     parser.add_argument('--from_weight', default='full_sft', type=str, help="어떤 가중치에서 학습을 시작할지 지정합니다")
-    parser.add_argument("--reward_model_path", type=str, default="../internlm2-1_8b-reward", help="리워드 모델 경로")
+    parser.add_argument("--reward_model_path", type=str, default="../models/internlm2-1_8b-reward", help="리워드 모델 경로")
     parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="자동 감지 후 이어서 학습할지 여부(0=아니오, 1=예)")
     parser.add_argument("--use_wandb", action="store_true", help="wandb 사용 여부")
     parser.add_argument("--wandb_project", type=str, default="MiniMind-PPO", help="wandb 프로젝트 이름")

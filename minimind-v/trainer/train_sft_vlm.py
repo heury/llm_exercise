@@ -73,7 +73,7 @@ def train_epoch(epoch, loader, iters, start_step=0, wandb=None):
             clean_state_dict = {k: v.half().cpu() for k, v in clean_state_dict.items()}  # 반정밀도로 저장하고 CPU로 이동
             torch.save(clean_state_dict, ckp)
             vlm_checkpoint(vlm_config, weight=args.save_weight, model=model, optimizer=optimizer, 
-                         epoch=epoch, step=step, wandb=wandb, save_dir='../../checkouts', scaler=scaler)
+                         epoch=epoch, step=step, wandb=wandb, save_dir='../checkouts', scaler=scaler)
             model.train()
             del state_dict, clean_state_dict
 
@@ -89,7 +89,7 @@ def train_epoch(epoch, loader, iters, start_step=0, wandb=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind-V SFT 학습")
-    parser.add_argument("--save_dir", type=str, default="../../checkouts", help="모델 저장 디렉터리")
+    parser.add_argument("--save_dir", type=str, default="../checkouts", help="모델 저장 디렉터리")
     parser.add_argument('--save_weight', default='sft_vlm', type=str, help="저장할 가중치 파일의 접두사")
     parser.add_argument("--epochs", type=int, default=2, help="학습 에폭 수")
     parser.add_argument("--batch_size", type=int, default=4, help="배치 크기")
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 수")
     parser.add_argument('--max_seq_len', default=768, type=int, help="학습 시 최대 절단 길이")
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부(0=아니오, 1=예)")
-    parser.add_argument("--data_path", type=str, default="../../datasets/sft_i2t.parquet", help="학습 데이터 경로")
+    parser.add_argument("--data_path", type=str, default="../datasets/sft_i2t.parquet", help="학습 데이터 경로")
     parser.add_argument('--from_weight', default='pretrain_vlm', type=str, help="어떤 가중치에서 학습을 시작할지 지정합니다. none이면 기반 가중치 없이 학습합니다")
     parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="자동 감지 후 이어서 학습할지 여부(0=아니오, 1=예)")
     parser.add_argument('--freeze_llm', default=1, type=int, choices=[0, 1, 2], help="동결 정책(0=전체 학습, 1=동결 후 첫/마지막 레이어만 해제, 2=전체 동결 후 proj만 학습)")
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     # ========== 2. 디렉터리와 모델 파라미터 설정 및 체크포인트 확인 ==========
     os.makedirs(args.save_dir, exist_ok=True)
     vlm_config = VLMConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers, max_seq_len=args.max_seq_len, use_moe=bool(args.use_moe))
-    ckp_data = vlm_checkpoint(vlm_config, weight=args.save_weight, save_dir='../../checkouts') if args.from_resume==1 else None
+    ckp_data = vlm_checkpoint(vlm_config, weight=args.save_weight, save_dir='../checkouts') if args.from_resume==1 else None
     
     # ========== 3. 혼합 정밀도 설정 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"

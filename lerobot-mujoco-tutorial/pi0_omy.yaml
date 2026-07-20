@@ -5,7 +5,8 @@ policy:
   type : pi0
   chunk_size: 5
   n_action_steps: 5
-  
+  push_to_hub: false
+
 save_checkpoint: true
 output_dir: ./ckpt/pi0_omy # Save directory
 batch_size: 16
@@ -21,7 +22,7 @@ save_freq: 10_000
 use_policy_training_preset: true
   
 wandb:
-  enable: true
+  enable: false
   project: pi0_omy
   entity: <your_wandb_entity>
   disable_artifact: true

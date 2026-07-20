@@ -1,0 +1,31 @@
+[project]
+name = "llm-exercise"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "datasets==3.6.0",
+    "einops>=0.8.2",
+    "fastapi>=0.115",
+    "numpy>=2.1",
+    "openai==1.59.6",
+    "pyarrow==23.0.1",
+    "pydantic==2.11.5",
+    "requests>=2.32",
+    "sentencepiece==0.2.0",
+    "streamlit==1.50.0",
+    "swanlab==0.7.11",
+    "tiktoken>=0.13.0",
+    "torch==2.6.0",
+    "transformers==4.57.6",
+    "uvicorn>=0.34",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true

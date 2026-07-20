@@ -2,17 +2,28 @@
 이 저장소는 커스텀 데이터셋에서 시연 데이터를 수집하고 비전-언어-행동 모델을 학습하거나 파인튜닝하기 위한 최소 예제를 담고 있습니다.
 
 ## 목차
-- [:pencil: 설치](#설치)
-- [:mega: 업데이트 및 계획](#업데이트--계획)
-- [:video_game: 1. 시연 데이터 수집](#1-시연-데이터-수집)
-- [:movie_camera: 2. 데이터 재생](#2-데이터-재생)
-- [:fire: 3. Action-Chunking-Transformer(ACT) 학습](#3-action-chunking-transformeract-학습)
-- [:pushpin: 4. ACT 배포](#4-정책-배포)
-- [:floppy_disk: 5-6. 언어 조건 환경](#5-6-언어-조건-환경에서-데이터-수집과-시각화)
-- [모델과 데이터셋](#모델과-데이터셋)
-- [:zap: 7. pi_0 학습 및 배포](#7-pi_0-학습-및-배포)
-- [:bulb: 8. SmolVLA 학습 및 배포](#8-smolvla-학습-및-배포)
-- [:pencil: 감사의 글](#감사의-글)
+- [MuJoCo와 함께하는 LeRobot 튜토리얼](#mujoco와-함께하는-lerobot-튜토리얼)
+  - [목차](#목차)
+  - [설치](#설치)
+    - [업데이트 및 계획](#업데이트-및-계획)
+  - [1. 시연 데이터 수집](#1-시연-데이터-수집)
+  - [2. 데이터 재생](#2-데이터-재생)
+  - [3. Action-Chunking-Transformer(ACT) 학습](#3-action-chunking-transformeract-학습)
+  - [4. 정책 배포](#4-정책-배포)
+  - [5-6. 언어 조건 환경에서 데이터 수집과 시각화](#5-6-언어-조건-환경에서-데이터-수집과-시각화)
+    - [환경](#환경)
+  - [모델과 데이터셋](#모델과-데이터셋)
+  - [7. pi\_0 학습 및 배포](#7-pi_0-학습-및-배포)
+    - [학습 스크립트](#학습-스크립트)
+    - [학습된 정책의 롤아웃](#학습된-정책의-롤아웃)
+    - [학습 로그](#학습-로그)
+    - [설정 파일](#설정-파일)
+  - [8. SmolVLA 학습 및 배포](#8-smolvla-학습-및-배포)
+    - [학습 스크립트](#학습-스크립트-1)
+    - [학습된 정책의 롤아웃](#학습된-정책의-롤아웃-1)
+    - [학습 로그](#학습-로그-1)
+    - [설정 파일](#설정-파일-1)
+  - [감사의 글](#감사의-글)
 
 ## 설치
 환경은 Python 3.10에서 테스트했습니다.
@@ -136,27 +147,6 @@ features={
 
 <image src="./media/inference.png"  width="480" height="360">
 
-<details>
-    <summary>PicklingError: Can't pickle <function <lambda> at 0x131d1bd00>: attribute lookup <lambda> on __main__ failed</summary>
-PicklingError가 발생하는 경우,
-
-```
-PicklingError: Can't pickle <function <lambda> at 0x131d1bd00>: attribute lookup <lambda> on __main__ failed
-```
-
-다음과 같이 `num_workers`를 0으로 설정하세요.
-
-```
-dataloader = torch.utils.data.DataLoader(
-    dataset,
-    num_workers=0, # 4
-    batch_size=64,
-    shuffle=True,
-    pin_memory=device.type != "cpu",
-    drop_last=True,
-)
-```
-</details>
 
 ## 4. 정책 배포
 

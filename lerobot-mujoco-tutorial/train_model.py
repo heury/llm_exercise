@@ -26,7 +26,7 @@ from torch.optim import Optimizer
 
 from lerobot.datasets.factory import make_dataset
 from lerobot.datasets.sampler import EpisodeAwareSampler
-from lerobot.utils.utils import cycle
+from lerobot.datasets.utils import cycle
 from lerobot.envs.factory import make_env
 from lerobot.optim.factory import make_optimizer_and_scheduler
 from lerobot.policies.factory import make_policy
@@ -34,20 +34,20 @@ from lerobot.policies.pretrained import PreTrainedPolicy
 from lerobot.policies.utils import get_device_from_parameters
 from lerobot.utils.logging_utils import AverageMeter, MetricsTracker
 from lerobot.utils.random_utils import set_seed
-from lerobot.common.train_utils import (
+from lerobot.utils.train_utils import (
     get_step_checkpoint_dir,
     get_step_identifier,
     load_training_state,
     save_checkpoint,
     update_last_checkpoint,
 )
-from lerobot.utils.device_utils import get_safe_torch_device
 from lerobot.utils.utils import (
     format_big_number,
+    get_safe_torch_device,
     has_method,
     init_logging,
 )
-from lerobot.common.wandb_utils import WandBLogger
+from lerobot.rl.wandb_utils import WandBLogger
 from lerobot.configs import parser
 from lerobot.configs.train import TrainPipelineConfig
 from lerobot.scripts.lerobot_eval import eval_policy

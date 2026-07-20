@@ -31,7 +31,7 @@ def init_model(args):
 
 def main():
     parser = argparse.ArgumentParser(description="MiniMind 모델 추론 및 대화")
-    parser.add_argument('--load_from', default='../models', type=str, help="모델 로드 경로(model=네이티브 torch 가중치, 다른 경로=transformers 형식)")
+    parser.add_argument('--load_from', default='./model', type=str, help="모델 로드 경로(model=네이티브 torch 가중치, 다른 경로=transformers 형식)")
     parser.add_argument('--save_dir', default='../checkouts', type=str, help="모델 가중치 디렉터리")
     parser.add_argument('--weight', default='full_sft', type=str, help="가중치 이름 접두사(pretrain, full_sft, rlhf, reason, ppo_actor, grpo, spo)")
     parser.add_argument('--lora_weight', default='None', type=str, help="LoRA 가중치 이름(None이면 사용하지 않음, 선택: lora_identity, lora_medical)")
@@ -49,14 +49,13 @@ def main():
     args = parser.parse_args()
     
     prompts = [
-        '당신은 어떤 장점이 있나요?',
-        '하늘은 왜 파란가요?',
-        'Python으로 피보나치 수열을 계산하는 함수를 작성해 주세요',
-        '"광합성"의 기본 과정을 설명해 주세요',
-        '내일 비가 오면 어떻게 외출해야 할까요?',
-        '고양이와 개를 반려동물로 키울 때의 장단점을 비교해 주세요',
-        '머신러닝이 무엇인지 설명해 주세요',
-        '중국의 맛있는 음식을 몇 가지 추천해 주세요'
+        'What are your strengths?',
+        'Why is the sky blue?',
+        'Write a Python function that computes the Fibonacci sequence',
+        'Explain the basic process of "photosynthesis"',
+        'How should I go out if it rains tomorrow?',
+        'Compare the pros and cons of keeping a cat versus a dog as a pet',
+        'Explain what machine learning is',
     ]
     
     conversation = []

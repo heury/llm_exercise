@@ -1,18 +1,16 @@
 {
-    "codebase_version": "v2.1",
+    "codebase_version": "v3.0",
     "robot_type": "omy",
     "total_episodes": 1,
     "total_frames": 137,
     "total_tasks": 1,
-    "total_videos": 0,
-    "total_chunks": 1,
     "chunks_size": 1000,
     "fps": 20,
     "splits": {
         "train": "0:1"
     },
-    "data_path": "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet",
-    "video_path": "videos/chunk-{episode_chunk:03d}/{video_key}/episode_{episode_index:06d}.mp4",
+    "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+    "video_path": "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4",
     "features": {
         "observation.image": {
             "dtype": "image",
@@ -25,7 +23,8 @@
                 "height",
                 "width",
                 "channels"
-            ]
+            ],
+            "fps": 20
         },
         "observation.wrist_image": {
             "dtype": "image",
@@ -38,7 +37,8 @@
                 "height",
                 "width",
                 "channel"
-            ]
+            ],
+            "fps": 20
         },
         "observation.state": {
             "dtype": "float32",
@@ -47,7 +47,8 @@
             ],
             "names": [
                 "state"
-            ]
+            ],
+            "fps": 20
         },
         "action": {
             "dtype": "float32",
@@ -56,7 +57,8 @@
             ],
             "names": [
                 "action"
-            ]
+            ],
+            "fps": 20
         },
         "obj_init": {
             "dtype": "float32",
@@ -65,42 +67,50 @@
             ],
             "names": [
                 "obj_init"
-            ]
+            ],
+            "fps": 20
         },
         "timestamp": {
             "dtype": "float32",
             "shape": [
                 1
             ],
-            "names": null
+            "names": null,
+            "fps": 20
         },
         "frame_index": {
             "dtype": "int64",
             "shape": [
                 1
             ],
-            "names": null
+            "names": null,
+            "fps": 20
         },
         "episode_index": {
             "dtype": "int64",
             "shape": [
                 1
             ],
-            "names": null
+            "names": null,
+            "fps": 20
         },
         "index": {
             "dtype": "int64",
             "shape": [
                 1
             ],
-            "names": null
+            "names": null,
+            "fps": 20
         },
         "task_index": {
             "dtype": "int64",
             "shape": [
                 1
             ],
-            "names": null
+            "names": null,
+            "fps": 20
         }
-    }
+    },
+    "data_files_size_in_mb": 100,
+    "video_files_size_in_mb": 200
 }
