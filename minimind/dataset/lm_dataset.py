@@ -84,7 +84,9 @@ class SFTDataset(Dataset):
             add_generation_prompt=False,
             tools=tools
         )
-
+    
+    # <s>system\n...</s>\n<s>user\n...</s>\n<s>assistant\n(답변 내용)</s>\n
+    # assistant의 답변 내용만 label로 사용하고, system과 user는 -100으로 처리
     def generate_labels(self, input_ids):
         labels = [-100] * len(input_ids)
         i = 0

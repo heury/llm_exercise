@@ -1,0 +1,13 @@
+[project]
+name = "hybrid-search"
+version = "0.1.0"
+description = "BM25 vs Vector Search 비교 및 LangChain EnsembleRetriever 하이브리드 검색 예제"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "faiss-cpu==1.9.0",
+    "konlpy==0.6.0",
+    "langchain==0.3.7",
+    "langchain-community==0.3.7",
+    "rank-bm25==0.2.2",
+    "sentence-transformers==2.3.1",
+]
