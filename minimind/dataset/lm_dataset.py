@@ -104,7 +104,12 @@ class SFTDataset(Dataset):
             else:
                 i += 1
         return labels
-
+    
+    # model_minimind.py:251을 보면:
+    # x, y = logits[..., :-1, :].contiguous(), labels[..., 1:].contiguous()
+    # loss = F.cross_entropy(x.view(-1, x.size(-1)), y.view(-1), ignore_index=-100)
+    # logits[..., :-1, :] → 마지막 위치를 제외한 모든 예측값
+    # labels[..., 1:] → 첫 위치를 제외한 모든 정답값
     def __getitem__(self, index):
         sample = self.samples[index]
         conversations = pre_processing_chat(sample['conversations'])

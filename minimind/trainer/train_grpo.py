@@ -186,7 +186,7 @@ def grpo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, reward_mod
             state_dict = raw_model.state_dict()
             torch.save({k: v.half().cpu() for k, v in state_dict.items()}, ckp)
             lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer, 
-                         epoch=epoch, step=step, wandb=wandb, save_dir='../checkouts', scheduler=scheduler)
+                         epoch=epoch, step=step, wandb=wandb, save_dir='./checkouts', scheduler=scheduler)
             model.train()
             del state_dict
 
@@ -205,7 +205,7 @@ def grpo_train_epoch(epoch, loader, iters, rollout_engine, ref_model, reward_mod
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind GRPO(그룹 상대 정책 최적화)")
-    parser.add_argument("--save_dir", type=str, default="../checkouts", help="모델 저장 디렉터리")
+    parser.add_argument("--save_dir", type=str, default="./checkouts", help="모델 저장 디렉터리")
     parser.add_argument('--save_weight', default='grpo', type=str, help="저장할 가중치 파일의 접두사")
     parser.add_argument("--epochs", type=int, default=1, help="학습 에폭 수")
     parser.add_argument("--batch_size", type=int, default=2, help="배치 크기")
@@ -222,14 +222,14 @@ if __name__ == "__main__":
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부(0=아니오, 1=예)")
     parser.add_argument('--max_seq_len', default=768, type=int, help="최대 프롬프트 길이")
     parser.add_argument("--max_gen_len", type=int, default=1024, help="최대 생성 길이")
-    parser.add_argument("--data_path", type=str, default="../datasets/rlaif_english_alpaca_mini.jsonl", help="RLAIF 데이터 경로")
+    parser.add_argument("--data_path", type=str, default="./datasets/rlaif_english_alpaca_mini.jsonl", help="RLAIF 데이터 경로")
     parser.add_argument("--num_generations", type=int, default=6, help="프롬프트당 생성 샘플 수")
     parser.add_argument("--beta", type=float, default=0.1, help="KL 패널티 계수")
     parser.add_argument("--loss_type", type=str, default="cispo", choices=["grpo", "cispo"], help="손실 타입")
     parser.add_argument("--epsilon", type=float, default=0.2, help="GRPO의 PPO 클립 epsilon")
     parser.add_argument("--epsilon_high", type=float, default=5.0, help="epsilon 상한")
     parser.add_argument('--from_weight', default='full_sft', type=str, help="어떤 가중치에서 학습을 시작할지 지정합니다")
-    parser.add_argument("--reward_model_path", type=str, default="../models/internlm2-1_8b-reward", help="리워드 모델 경로")
+    parser.add_argument("--reward_model_path", type=str, default="./models/internlm2-1_8b-reward", help="리워드 모델 경로")
     parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="자동 감지 후 이어서 학습할지 여부(0=아니오, 1=예)")
     parser.add_argument("--use_wandb", action="store_true", help="wandb 사용 여부")
     parser.add_argument("--wandb_project", type=str, default="MiniMind-GRPO", help="wandb 프로젝트 이름")
@@ -239,7 +239,7 @@ if __name__ == "__main__":
     parser.add_argument("--thinking_ratio", type=float, default=0.9, help="이 확률로 thinking을 활성화합니다(0.0~1.0)")
     parser.add_argument("--rollout_engine", type=str, default="torch", choices=["torch", "sglang"], help="롤아웃 엔진 타입")
     parser.add_argument("--sglang_base_url", type=str, default="http://localhost:8998", help="SGLang 서버 URL")
-    parser.add_argument("--sglang_model_path", type=str, default="../models", help="SGLang 토크나이저 경로")
+    parser.add_argument("--sglang_model_path", type=str, default="./models", help="SGLang 토크나이저 경로")
     parser.add_argument("--sglang_shared_path", type=str, default="./sglang_ckpt_grpo", help="SGLang 공유 저장 경로")
     args = parser.parse_args()
 
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config = MiniMindConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers,
                                max_seq_len=args.max_seq_len + args.max_gen_len, use_moe=bool(args.use_moe))
-    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../checkouts') if args.from_resume==1 else None
+    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='./checkouts') if args.from_resume==1 else None
     
     # ========== 3. 혼합 정밀도 설정 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"

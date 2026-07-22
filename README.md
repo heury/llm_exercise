@@ -43,7 +43,7 @@ uv sync
 Clone the dataset from Hugging Face into `minimind_dataset`:
 
 ```powershell
-git clone https://huggingface.co/datasets/caspar/llm_exercise_dataset minimind_dataset
+git clone https://huggingface.co/datasets/caspar/minimind_dataset minimind_dataset
 ```
 
 ### Use the environment

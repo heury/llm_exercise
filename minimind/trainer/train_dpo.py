@@ -113,7 +113,7 @@ def train_epoch(epoch, loader, iters, ref_model, lm_config, start_step=0, wandb=
             raw_model = getattr(raw_model, '_orig_mod', raw_model)
             state_dict = raw_model.state_dict()
             torch.save({k: v.half().cpu() for k, v in state_dict.items()}, ckp)
-            lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer, scaler=scaler, epoch=epoch, step=step, wandb=wandb, save_dir='../checkouts')
+            lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer, scaler=scaler, epoch=epoch, step=step, wandb=wandb, save_dir='./checkouts')
             model.train()
             del state_dict
 
@@ -130,7 +130,7 @@ def train_epoch(epoch, loader, iters, ref_model, lm_config, start_step=0, wandb=
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind DPO(직접 선호 최적화)")
-    parser.add_argument("--save_dir", type=str, default="../checkouts", help="모델 저장 디렉터리")
+    parser.add_argument("--save_dir", type=str, default="./checkouts", help="모델 저장 디렉터리")
     parser.add_argument('--save_weight', default='dpo', type=str, help="저장할 가중치 파일의 접두사")
     parser.add_argument("--epochs", type=int, default=1, help="학습 에폭 수")
     parser.add_argument("--batch_size", type=int, default=4, help="배치 크기")
@@ -146,7 +146,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 수")
     parser.add_argument('--max_seq_len', default=1024, type=int, help="학습 시 최대 절단 길이(중국어 기준 1토큰은 약 1.5~1.7자)")
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부(0=아니오, 1=예)")
-    parser.add_argument("--data_path", type=str, default="../datasets/dpo_english_orca_pairs_mini.jsonl", help="DPO 학습 데이터 경로")
+    parser.add_argument("--data_path", type=str, default="./datasets/dpo_english_orca_pairs_mini.jsonl", help="DPO 학습 데이터 경로")
     parser.add_argument('--from_weight', default='full_sft', type=str, help="어떤 가중치에서 학습을 시작할지 지정합니다")
     parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="자동 감지 후 이어서 학습할지 여부(0=아니오, 1=예)")
     parser.add_argument('--beta', default=0.15, type=float, help="DPO의 beta 파라미터")
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     # ========== 2. 디렉터리와 모델 파라미터 설정 및 체크포인트 확인 ==========
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config = MiniMindConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers, use_moe=bool(args.use_moe))
-    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../checkouts') if args.from_resume==1 else None
+    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='./checkouts') if args.from_resume==1 else None
     
     # ========== 3. 혼합 정밀도 설정 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"

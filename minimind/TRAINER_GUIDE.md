@@ -28,7 +28,7 @@ MiniMind의 일반적인 학습 파이프라인은 다음 순서로 이어집니
 ## 사전 준비
 - uv sync
 - uv tool install huggingface_hub
-- hf download caspar/llm_exercise_dataset --repo-type dataset --local-dir ./datasets
+- hf download caspar/minimind_dataset --repo-type dataset --local-dir ./datasets
 
 ## train_pretrain.py
 
@@ -43,7 +43,7 @@ MiniMind의 일반적인 학습 파이프라인은 다음 순서로 이어집니
 ### 사용 데이터
 
 - 데이터셋 클래스: `PretrainDataset`
-- 기본 경로: `../datasets/pretrain_english_wikitext2_mini.jsonl`
+- 기본 경로: `./datasets/pretrain_english_wikitext2_mini.jsonl`
 - 주요 처리:
   - 긴 텍스트를 tokenizer로 토큰화
   - `max_seq_len` 길이에 맞춰 자르거나 패딩
@@ -145,9 +145,9 @@ MiniMind의 일반적인 학습 파이프라인은 다음 순서로 이어집니
 
 ### 저장 산출물
 
-- 일반 가중치: `../checkouts/pretrain_{hidden_size}.pth`
-- MoE 가중치: `../checkouts/pretrain_{hidden_size}_moe.pth`
-- resume checkpoint: `../checkouts/pretrain_{hidden_size}[_moe]_resume.pth`
+- 일반 가중치: `./checkouts/pretrain_{hidden_size}.pth`
+- MoE 가중치: `./checkouts/pretrain_{hidden_size}_moe.pth`
+- resume checkpoint: `./checkouts/pretrain_{hidden_size}[_moe]_resume.pth`
 
 ### 실습
 - 학습: uv run .\trainer\train_pretrain.py
@@ -160,7 +160,7 @@ MiniMind의 일반적인 학습 파이프라인은 다음 순서로 이어집니
 pretrain 대비 달라지는 점:
 
 - 데이터셋이 `PretrainDataset`에서 `SFTDataset`으로 바뀝니다.
-- 기본 데이터 경로가 `../datasets/sft_t2t_mini.jsonl`입니다.
+- 기본 데이터 경로가 `./datasets/sft_t2t_mini.jsonl`입니다.
 - 기본 시작 가중치가 `from_weight=pretrain`입니다.
 - 저장 접두사가 `full_sft`입니다.
 - 학습률이 `5e-4`에서 `1e-5`로 낮아집니다.
@@ -260,7 +260,7 @@ pretrain 대비 달라지는 점:
 PPO와 비교하면 critic이 없고, 한 프롬프트에서 여러 샘플을 뽑아 그룹 내부 상대 보상으로 advantage를 만드는 점이 핵심입니다.
 
 ### 실습
-- 보상 모델: hf download internlm/internlm2-1_8b-reward --local-dir ../models/internlm2-1_8b-reward
+- 보상 모델: hf download internlm/internlm2-1_8b-reward --local-dir ./models/internlm2-1_8b-reward
 - 학습: uv run .\trainer\train_grpo.py
 - 테스트: uv run eval_llm.py --weight grpo
 

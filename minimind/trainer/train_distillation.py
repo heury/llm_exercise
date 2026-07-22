@@ -129,7 +129,7 @@ def train_epoch(epoch, loader, iters, teacher_model, lm_config_student, start_st
             raw_model = getattr(raw_model, '_orig_mod', raw_model)
             state_dict = raw_model.state_dict()
             torch.save({k: v.half().cpu() for k, v in state_dict.items()}, ckp)
-            lm_checkpoint(lm_config_student, weight=args.save_weight, model=model, optimizer=optimizer, scaler=scaler, epoch=epoch, step=step, wandb=wandb, save_dir='../checkouts')
+            lm_checkpoint(lm_config_student, weight=args.save_weight, model=model, optimizer=optimizer, scaler=scaler, epoch=epoch, step=step, wandb=wandb, save_dir='./checkouts')
             model.train()
             del state_dict
 
@@ -146,7 +146,7 @@ def train_epoch(epoch, loader, iters, teacher_model, lm_config_student, start_st
 if __name__ == "__main__":
     # MoE 모델에서 dense 모델을 증류하는 상황을 시뮬레이션합니다. 더 큰 teacher_hidden_size 모델로 더 작은 student_hidden_size 모델을 증류할 수도 있습니다
     parser = argparse.ArgumentParser(description="MiniMind 지식 증류")
-    parser.add_argument("--save_dir", type=str, default="../checkouts", help="모델 저장 디렉터리")
+    parser.add_argument("--save_dir", type=str, default="./checkouts", help="모델 저장 디렉터리")
     parser.add_argument('--save_weight', default='full_dist', type=str, help="저장할 가중치 파일의 접두사")
     parser.add_argument("--epochs", type=int, default=6, help="학습 에폭 수")
     parser.add_argument("--batch_size", type=int, default=32, help="배치 크기")
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     parser.add_argument("--log_interval", type=int, default=100, help="로그 출력 간격")
     parser.add_argument("--save_interval", type=int, default=100, help="모델 저장 간격")
     parser.add_argument("--max_seq_len", type=int, default=340, help="학습 시 최대 절단 길이(중국어 기준 1토큰은 약 1.5~1.7자)")
-    parser.add_argument("--data_path", type=str, default="../datasets/sft_t2t_mini.jsonl", help="학습 데이터 경로")
+    parser.add_argument("--data_path", type=str, default="./datasets/sft_t2t_mini.jsonl", help="학습 데이터 경로")
     parser.add_argument('--student_hidden_size', default=768, type=int, help="학생 모델 은닉층 차원")
     parser.add_argument('--student_num_layers', default=8, type=int, help="학생 모델 은닉층 수")
     parser.add_argument('--teacher_hidden_size', default=768, type=int, help="교사 모델 은닉층 차원")
@@ -185,7 +185,7 @@ if __name__ == "__main__":
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config_student = MiniMindConfig(hidden_size=args.student_hidden_size, num_hidden_layers=args.student_num_layers, use_moe=bool(args.student_use_moe))
     lm_config_teacher = MiniMindConfig(hidden_size=args.teacher_hidden_size, num_hidden_layers=args.teacher_num_layers, use_moe=bool(args.teacher_use_moe))
-    ckp_data = lm_checkpoint(lm_config_student, weight=args.save_weight, save_dir='../checkouts') if args.from_resume==1 else None
+    ckp_data = lm_checkpoint(lm_config_student, weight=args.save_weight, save_dir='./checkouts') if args.from_resume==1 else None
     
     # ========== 3. 혼합 정밀도 설정 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"

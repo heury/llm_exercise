@@ -40,11 +40,11 @@ def freeze_all_except_qk(model):
 
 # DLLM 모델 초기화 및 AR 사전훈련 가중치 로드
 def init_model_dllm(config, from_weight, device):
-    tokenizer = AutoTokenizer.from_pretrained('../../models', local_files_only=True)
+    tokenizer = AutoTokenizer.from_pretrained('../models', local_files_only=True)
     model = MiniMindForMaskedDiffusion(config)
     if from_weight and from_weight != 'none':
         moe_suffix = '_moe' if config.use_moe else ''
-        ckp = f'../../checkouts/{from_weight}_{config.hidden_size}{moe_suffix}.pth'
+        ckp = f'../checkouts/{from_weight}_{config.hidden_size}{moe_suffix}.pth'
         if os.path.exists(ckp):
             state_dict = torch.load(ckp, map_location=device)
             model.load_state_dict(state_dict, strict=False)
@@ -118,7 +118,7 @@ def train_epoch(epoch, loader, iters, start_step=0, wandb=None):
             # FP16으로 변환하여 저장 (디스크 공간 절약)
             torch.save({k: v.half().cpu() for k, v in state_dict.items()}, ckp)
             lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer,
-                         epoch=epoch, step=step, wandb=wandb, save_dir='../../checkouts', scaler=scaler)
+                         epoch=epoch, step=step, wandb=wandb, save_dir='../checkouts', scaler=scaler)
             model.train()
             del state_dict
 
@@ -135,7 +135,7 @@ def train_epoch(epoch, loader, iters, start_step=0, wandb=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind DLLM Full SFT")
-    parser.add_argument("--save_dir", type=str, default="../../checkouts", help="모델 저장 디렉토리")
+    parser.add_argument("--save_dir", type=str, default="../checkouts", help="모델 저장 디렉토리")
     parser.add_argument('--save_weight', default='dllm', type=str, help="저장 가중치 접두사")
     parser.add_argument("--epochs", type=int, default=5, help="훈련 에폭 수")
     parser.add_argument("--batch_size", type=int, default=32, help="배치 크기")
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 수")
     parser.add_argument('--max_seq_len', default=768, type=int, help="최대 시퀀스 길이")
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부 (0=아니오, 1=예)")
-    parser.add_argument("--data_path", type=str, default="../../datasets/sft_t2t_mini.jsonl", help="훈련 데이터 경로")
+    parser.add_argument("--data_path", type=str, default="../datasets/sft_t2t_mini.jsonl", help="훈련 데이터 경로")
     parser.add_argument('--from_weight', default='full_sft', type=str, help="AR 가중치 초기화 기반 (none이면 가중치 없이 훈련)")
     parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="자동 감지 및 이어서 훈련 (0=아니오, 1=예)")
     parser.add_argument("--use_wandb", action="store_true", help="wandb 사용 여부")
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     # ========== 2. 디렉토리, 모델 파라미터 설정, 체크포인트 확인 ==========
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config = MiniMindDLLMConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers, use_moe=bool(args.use_moe))
-    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../../checkouts') if args.from_resume == 1 else None
+    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../checkouts') if args.from_resume == 1 else None
 
     # ========== 3. 혼합 정밀도 설정 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"

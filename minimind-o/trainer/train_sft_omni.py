@@ -124,7 +124,7 @@ def train_epoch(epoch, loader, iters, start_step=0, wandb=None):
             clean_state_dict = {k: v for k, v in raw_model.state_dict().items() if not k.startswith('audio_encoder.')}
             torch.save({k: v.half().cpu() for k, v in clean_state_dict.items()}, ckp)
             omni_checkpoint(omni_config, weight=args.save_weight, model=model, optimizer=optimizer, 
-                          epoch=epoch, step=step, wandb=wandb, save_dir='../../checkouts', scaler=scaler)
+                          epoch=epoch, step=step, wandb=wandb, save_dir='../checkouts', scaler=scaler)
             model.train()
 
         del input_ids, labels, audio_labels, audio_inputs, audio_lens, pixel_values, spk_emb, res, loss
@@ -139,7 +139,7 @@ def train_epoch(epoch, loader, iters, start_step=0, wandb=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind-O SFT 학습")
-    parser.add_argument("--save_dir", type=str, default="../../checkouts", help="모델 저장 디렉터리")
+    parser.add_argument("--save_dir", type=str, default="../checkouts", help="모델 저장 디렉터리")
     parser.add_argument('--save_weight', default='sft_omni', type=str, help="저장할 가중치 파일의 접두사")
     parser.add_argument("--epochs", type=int, default=15, help="학습 에폭 수")
     parser.add_argument("--batch_size", type=int, default=32, help="배치 크기")
@@ -155,9 +155,9 @@ if __name__ == "__main__":
     parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 수")
     parser.add_argument('--max_seq_len', default=512, type=int, help="학습 시 최대 절단 길이")
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부")
-    parser.add_argument("--data_path", type=str, default="../../datasets/train_t2a_mini.parquet", help="학습 데이터 경로(parquet 형식)")
-    parser.add_argument("--audio_encoder_dir", type=str, default="../../models/SenseVoiceSmall", help="오디오 인코더 경로(SenseVoice)")
-    parser.add_argument("--vision_dir", type=str, default="../../models/siglip2-base-p32-256-ve", help="CLIP 비전 모델 경로")
+    parser.add_argument("--data_path", type=str, default="../datasets/train_t2a_mini.parquet", help="학습 데이터 경로(parquet 형식)")
+    parser.add_argument("--audio_encoder_dir", type=str, default="../models/SenseVoiceSmall", help="오디오 인코더 경로(SenseVoice)")
+    parser.add_argument("--vision_dir", type=str, default="../models/siglip2-base-p32-256-ve", help="CLIP 비전 모델 경로")
     parser.add_argument('--from_weight', default='llm', type=str, help="어떤 가중치에서 학습을 시작할지 지정합니다. none이면 기반 가중치 없이 학습합니다")
     parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="자동 감지 후 이어서 학습할지 여부(0=아니오, 1=예)")
     parser.add_argument('--freeze_backbone', default='none', type=str, choices=['none', 'all', 'last1'], help="백본 동결: none=전체 학습, all=오디오 레이어만 학습, last1=마지막 1개 레이어와 오디오 레이어만 학습")
@@ -180,7 +180,7 @@ if __name__ == "__main__":
         num_hidden_layers=args.num_hidden_layers, 
         use_moe=bool(args.use_moe)
     )
-    ckp_data = omni_checkpoint(omni_config, weight=args.save_weight, save_dir='../../checkouts') if args.from_resume==1 else None
+    ckp_data = omni_checkpoint(omni_config, weight=args.save_weight, save_dir='../checkouts') if args.from_resume==1 else None
     
     # ========== 3. 혼합 정밀도 설정 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"

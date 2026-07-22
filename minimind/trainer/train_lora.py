@@ -63,7 +63,7 @@ def train_epoch(epoch, loader, iters, lora_params, start_step=0, wandb=None):
             lora_save_path = f'{args.save_dir}/{args.lora_name}_{lm_config.hidden_size}{moe_suffix}.pth'
             # LoRA는 LoRA 가중치만 저장합니다
             save_lora(model, lora_save_path)
-            lm_checkpoint(lm_config, weight=args.lora_name, model=model, optimizer=optimizer, scaler=scaler, epoch=epoch, step=step, wandb=wandb, save_dir='../checkouts')
+            lm_checkpoint(lm_config, weight=args.lora_name, model=model, optimizer=optimizer, scaler=scaler, epoch=epoch, step=step, wandb=wandb, save_dir='./checkouts')
             model.train()
 
         del input_ids, labels, res, loss
@@ -77,7 +77,7 @@ def train_epoch(epoch, loader, iters, lora_params, start_step=0, wandb=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind LoRA 파인튜닝")
-    parser.add_argument("--save_dir", type=str, default="../checkouts", help="모델 저장 디렉터리")
+    parser.add_argument("--save_dir", type=str, default="./checkouts", help="모델 저장 디렉터리")
     parser.add_argument("--lora_name", type=str, default="lora_medical", help="LoRA 가중치 이름(예: lora_identity 또는 lora_medical)")
     parser.add_argument("--epochs", type=int, default=10, help="학습 에폭 수")
     parser.add_argument("--batch_size", type=int, default=32, help="배치 크기")
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_hidden_layers', default=8, type=int, help="은닉층 수")
     parser.add_argument('--max_seq_len', default=340, type=int, help="학습 시 최대 절단 길이(중국어 기준 1토큰은 약 1.5~1.7자)")
     parser.add_argument('--use_moe', default=0, type=int, choices=[0, 1], help="MoE 아키텍처 사용 여부(0=아니오, 1=예)")
-    parser.add_argument("--data_path", type=str, default="../datasets/lora_medical_english_chatdoctor_mini.jsonl", help="LoRA 학습 데이터 경로")
+    parser.add_argument("--data_path", type=str, default="./datasets/lora_medical_english_chatdoctor_mini.jsonl", help="LoRA 학습 데이터 경로")
     parser.add_argument('--from_weight', default='full_sft', type=str, help="어떤 가중치에서 학습을 시작할지 지정합니다. 기본값은 full_sft입니다")
     parser.add_argument('--from_resume', default=0, type=int, choices=[0, 1], help="자동 감지 후 이어서 학습할지 여부(0=아니오, 1=예)")
     parser.add_argument("--use_wandb", action="store_true", help="wandb 사용 여부")
@@ -109,7 +109,7 @@ if __name__ == "__main__":
     # ========== 2. 디렉터리와 모델 파라미터 설정 및 체크포인트 확인 ==========
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config = MiniMindConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers, use_moe=bool(args.use_moe))
-    ckp_data = lm_checkpoint(lm_config, weight=args.lora_name, save_dir='../checkouts') if args.from_resume==1 else None
+    ckp_data = lm_checkpoint(lm_config, weight=args.lora_name, save_dir='./checkouts') if args.from_resume==1 else None
     
     # ========== 3. 혼합 정밀도 설정 ==========
     device_type = "cuda" if "cuda" in args.device else "cpu"

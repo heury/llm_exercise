@@ -357,7 +357,7 @@ def rl_train_epoch(epoch, loader, iters, rollout_engine, ref_model, reward_model
             state_dict = raw_model.state_dict()
             torch.save({k: v.half().cpu() for k, v in state_dict.items()}, ckp)
             lm_checkpoint(lm_config, weight=args.save_weight, model=model, optimizer=optimizer,
-                         epoch=epoch, step=step, wandb=wandb, save_dir='../checkouts', scheduler=scheduler)
+                         epoch=epoch, step=step, wandb=wandb, save_dir='./checkouts', scheduler=scheduler)
             model.train()
             del state_dict
 
@@ -373,7 +373,7 @@ def rl_train_epoch(epoch, loader, iters, rollout_engine, ref_model, reward_model
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MiniMind Agent 강화학습")
-    parser.add_argument("--save_dir", type=str, default="../checkouts", help="모델 저장 디렉터리")
+    parser.add_argument("--save_dir", type=str, default="./checkouts", help="모델 저장 디렉터리")
     parser.add_argument('--save_weight', default='agent', type=str, help="저장할 가중치 이름")
     parser.add_argument("--epochs", type=int, default=1, help="학습 에폭 수")
     parser.add_argument("--batch_size", type=int, default=2, help="배치 크기")
@@ -391,7 +391,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_seq_len', default=1024, type=int, help="최대 시퀀스 길이")
     parser.add_argument("--max_gen_len", type=int, default=768, help="호출 1회당 최대 생성 길이")
     parser.add_argument("--max_total_len", type=int, default=2500, help="학습 시 최종 전체 길이 상한")
-    parser.add_argument("--data_path", type=str, default="../datasets/agent_rl.jsonl", help="학습 데이터 경로")
+    parser.add_argument("--data_path", type=str, default="./datasets/agent_rl.jsonl", help="학습 데이터 경로")
     parser.add_argument("--num_generations", type=int, default=4, help="프롬프트당 생성 개수")
     parser.add_argument("--beta", type=float, default=0.1, help="KL 발산 패널티 계수")
     parser.add_argument("--loss_type", type=str, default="cispo", choices=["grpo", "cispo"], help="손실 타입")
@@ -405,10 +405,10 @@ if __name__ == "__main__":
     parser.add_argument("--debug_mode", action="store_true", help="디버그 모드")
     parser.add_argument("--debug_interval", type=int, default=20, help="디버그 로그 간격")
     parser.add_argument("--thinking_ratio", type=float, default=0.1, help="이 확률로 thinking을 활성화합니다(0.0~1.0)")
-    parser.add_argument("--reward_model_path", type=str, default="../models/internlm2-1_8b-reward", help="리워드 모델 경로")
+    parser.add_argument("--reward_model_path", type=str, default="./models/internlm2-1_8b-reward", help="리워드 모델 경로")
     parser.add_argument("--rollout_engine", type=str, default="torch", choices=["torch", "sglang"], help="롤아웃 엔진 타입")
     parser.add_argument("--sglang_base_url", type=str, default="http://localhost:8998", help="SGLang 서버 URL")
-    parser.add_argument("--sglang_model_path", type=str, default="../models", help="SGLang 토크나이저 경로")
+    parser.add_argument("--sglang_model_path", type=str, default="./models", help="SGLang 토크나이저 경로")
     parser.add_argument("--sglang_shared_path", type=str, default="./sglang_ckpt_agent", help="SGLang 공유 저장 경로")
     args = parser.parse_args()
 
@@ -419,7 +419,7 @@ if __name__ == "__main__":
     os.makedirs(args.save_dir, exist_ok=True)
     lm_config = MiniMindConfig(hidden_size=args.hidden_size, num_hidden_layers=args.num_hidden_layers,
                                max_seq_len=args.max_seq_len + args.max_gen_len, use_moe=bool(args.use_moe))
-    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='../checkouts') if args.from_resume == 1 else None
+    ckp_data = lm_checkpoint(lm_config, weight=args.save_weight, save_dir='./checkouts') if args.from_resume == 1 else None
 
     device_type = "cuda" if "cuda" in args.device else "cpu"
     dtype = torch.bfloat16 if args.dtype == "bfloat16" else torch.float16
